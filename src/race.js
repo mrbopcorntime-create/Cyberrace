@@ -1,0 +1,406 @@
+import * as THREE from 'three';
+import { CUPS, CHARACTERS, CLASSES, LAPS, POINTS, PLACE_BITS, FUSION_IDS, itemInfo, STARTERS } from './data.js';
+import { Track, HALF_W } from './track.js';
+import { Racer, DRIFT_COLORS } from './racer.js';
+import { AIDriver } from './ai.js';
+import { ItemSystem } from './items.js';
+import { Particles } from './models.js';
+import { clamp, damp, wrap, lerp } from './util.js';
+
+const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _f = { pos: new THREE.Vector3(), t: new THREE.Vector3(), r: new THREE.Vector3(), u: new THREE.Vector3(), k: 0 };
+
+export class Race {
+  // opts: { mode:'cup'|'quick'|'tt', cup, track, clock, player:{char, cls, paint, neon, trail, upgrades}, grid: [charIds] }
+  constructor(game, opts) {
+    this.game = game; this.opts = opts; this.mode = opts.mode;
+    this.clock = opts.clock;
+    this.cup = CUPS[opts.cup]; this.def = this.cup.tracks[opts.track];
+    this.scene = new THREE.Scene();
+    this.camera = new THREE.PerspectiveCamera(72, 16 / 9, 0.3, 2600);
+    this.time = -4.2; this.started = false; this.over = false; this.paused = false;
+    this.finishCount = 0; this.camMode = game.settings.camera || 'chase';
+    this.shake = 0; this.lookBack = false;
+    this.flags = {}; this.st = newRaceStats(); this.feed = [];
+    this.barrageHits = 0; this.barrageT = 0;
+
+    const quality = game.quality;
+    this.track = new Track(this.cup, this.def);
+    this.track.build(this.scene, quality);
+    this.scene.add(new THREE.HemisphereLight(0x9fc8ff, 0x201030, 1.4));
+    const dl = new THREE.DirectionalLight(0xffffff, 1.6); dl.position.set(0.3, 1, 0.4); this.scene.add(dl);
+    const rim = new THREE.DirectionalLight(this.cup.pal.a, 1.2); rim.position.set(-0.5, 0.3, -1); this.scene.add(rim);
+    this.particles = new Particles(this.scene, quality > 0 ? 2000 : 1100);
+    this.items = new ItemSystem(this);
+
+    // roster
+    this.racers = [];
+    this.ai = [];
+    const p = opts.player;
+    const grid = this.mode === 'tt' ? [p.char] : opts.grid;
+    grid.forEach((cid, gi) => {
+      const ch = CHARACTERS.find(c => c.id === cid);
+      const isPlayer = cid === p.char;
+      const row = Math.floor(gi / 2), col = gi % 2;
+      const r = new Racer(this, {
+        idx: gi, char: ch, cls: isPlayer ? p.cls : ch.cls, isPlayer,
+        dist: -6 - row * 7 - col * 2.5, x: (col ? 1 : -1) * 4.5 + (row % 2 ? 1.5 : -1.5),
+        paint: isPlayer ? p.paint : 0x15182a + (gi * 0x030303), neon: isPlayer ? p.neon : null, trail: isPlayer ? p.trail : 'std',
+        upgrades: isPlayer ? p.upgrades : aiUpgrades(this.clock.id), aiSkill: 0.9 + Math.random() * 0.12,
+      });
+      this.racers.push(r);
+      if (isPlayer) this.player = r;
+      else this.ai.push(new AIDriver(r, this, clamp(this.clock.ai * (0.9 + Math.random() * 0.15), 0.6, 1.05)));
+    });
+    if (this.mode === 'tt') this.player.items = ['surge', 'surge'];
+    else if (this.player.mods.startItem) this.player.items[0] = this.player.mods.startItem;
+    for (const r of this.racers) if (!r.isPlayer && r.mods.startItem) r.items[0] = r.mods.startItem;
+    this.camPos = new THREE.Vector3(); this.camLook = new THREE.Vector3(); this.camInit = false;
+    this.fov = 72;
+    this.rocket = { pressedAt: null, early: false };
+    this.racers.forEach(r => r.render(0));
+    this.updatePlaces();
+    this.fx = makeFx(this);
+  }
+
+  // ─── helpers ──────────────────────────────────────────────────────────────
+  wrapDiff(a, b) { const L = this.track.L; return wrap(a - b + L / 2, L) - L / 2; }
+  relDist(o, r) { return this.wrapDiff(o.dist, r.dist); }
+  assist(r) { return r.isPlayer ? this.game.settings.assist !== false : true; }
+  rubber(r) {
+    if (r.isPlayer || this.mode === 'tt') return 1;
+    const d = r.dist - this.player.dist;
+    const k = this.clock.id === 2 ? 0.5 : 1;
+    if (d > 120) return 1 - 0.05 * k;
+    if (d < -150) return 1 + 0.07 * k;
+    return 1;
+  }
+  flag(id) { if (!this.flags[id]) { this.flags[id] = true; this.game.achFlag(id); } }
+
+  // ─── event hooks (player stats + feed) ─────────────────────────────────────
+  onDriftBoost(r, lv) { if (r.isPlayer) { this.st.driftBoosts++; this.st['drift' + lv]++; this.st.bits += lv * 10; } }
+  onLand(r, airT, perfect) {
+    if (!r.isPlayer) return;
+    this.st.air += airT;
+    if (airT >= 1.5) this.flag('air2');
+    if (perfect) { this.st.lands++; this.st.bits += 15; this.fx.text('PERFECT LANDING', '#7affff'); }
+    this.game.haptic(20, 120);
+  }
+  onPad(r) { if (r.isPlayer) this.st.pads++; }
+  onSlip(r) { if (r.isPlayer) { this.st.slips++; this.st.bits += 10; this.fx.text('SLIPSTREAM', '#bfe8ff'); } }
+  onPickup(r, id) { if (r.isPlayer) this.game.audio.sfx('pickup'); }
+  onItemUse(r, id) {
+    if (!r.isPlayer) return;
+    this.st.itemsUsed++;
+    if (id === 'surge') this.st.surges++;
+    if (id === 'barrage') { this.barrageHits = 0; this.barrageT = 6; }
+    if (FUSION_IDS.includes(id)) this.st.fuseMask |= 1 << FUSION_IDS.indexOf(id);
+  }
+  onFuse(r, id) {
+    if (r.isPlayer) { this.st.fusions++; this.fx.text('FUSED: ' + itemInfo(id).name, itemInfo(id).color); this.game.audio.sfx('fuse'); this.game.haptic(40, 160); }
+  }
+  onItemHit(owner, victim, kind, tag) {
+    if (!owner) return;
+    if (owner.isPlayer) {
+      if (kind === 'plasma') this.st.plasmaHits++;
+      if (kind === 'trap') this.st.trapHits++;
+      if (kind === 'emp') this.st.empHits++;
+      this.st.bits += 25;
+      if (tag === 'barrage' && this.barrageT > 0 && ++this.barrageHits >= 3) this.flag('barrage3');
+      this.feedMsg(`${kindName(kind)} ▸ ${victim.name}`, '#7affff');
+    } else if (victim.isPlayer) this.feedMsg(`${owner.name} ▸ ${kindName(kind)}`, '#ff6080');
+  }
+  onMelee(att, tgt, drifting) {
+    if (att.isPlayer) { this.st.meleeHits++; this.st.bits += 15; if (drifting) this.flag('tailwhip'); }
+  }
+  onKnockoff(att, victim) {
+    if (att.isPlayer) { this.st.knockoffs++; this.st.bits += 60; this.fx.text('KNOCKED OFF: ' + victim.name, '#ff9f40'); }
+    this.feedMsg(`${att.name} ⇢ shoved ${victim.name} off`, att.isPlayer ? '#ffb340' : '#ff6080');
+  }
+  onEvade(r) { if (r.isPlayer) { this.st.evades++; this.fx.text('EVADED!', '#9ffcff'); } }
+  onBlock(r) { if (r.isPlayer) { this.st.blocks++; } }
+  feedMsg(msg, color) { this.game.hud.feed(msg, color); }
+  stats = { distance: (r, d) => { if (r.isPlayer) this.st.distance += d; } };
+
+  // ─── main update ──────────────────────────────────────────────────────────
+  update(dt) {
+    if (this.paused) return;
+    const prevT = this.time;
+    this.time += dt;
+    const game = this.game, pl = this.player;
+    // countdown & rocket start
+    if (!this.started) {
+      const ip = game.input.state;
+      const thr = ip.throttle > 0.5 || game.settings.autoAccel;
+      if (thr && this.rocket.pressedAt === null) this.rocket.pressedAt = this.time;
+      if (!thr) this.rocket.pressedAt = null;
+      const cd = Math.ceil(-this.time);
+      const pcd = Math.ceil(-prevT);
+      if (cd !== pcd && cd >= 0 && cd <= 3) { game.hud.countdown(cd === 0 ? 'GO!' : String(cd)); game.audio.sfx(cd === 0 ? 'go' : 'beep'); }
+      if (this.time >= 0) {
+        this.started = true;
+        const pa = this.rocket.pressedAt;
+        if (pa !== null && !game.settings.autoAccel) {
+          if (pa >= -0.65 && pa <= -0.05) { pl.boost(1.2, 1.3); this.st.rockets++; this.st.bits += 50; this.fx.text('ROCKET START!', '#ffb340'); game.haptic(60, 200); }
+          else if (pa < -1.6) { pl.stallT = 0.9; this.fx.text('ENGINE STALL', '#ff5060'); }
+        }
+        for (const a of this.ai) if (Math.random() < a.skill * 0.6) a.r.boost(1.0, 1.25);
+        this.raceStart = performance.now();
+      }
+    }
+    // player input
+    if (!pl.finished) game.input.applyTo(pl.inp, this);
+    for (const a of this.ai) a.update(dt);
+    if (pl.finished && this.autopilot) this.autopilot.update(dt);
+    // physics
+    for (const r of this.racers) r.step(dt);
+    this.collide();
+    this.items.update(dt);
+    this.track.update(dt);
+    if (this.barrageT > 0) this.barrageT -= dt;
+    // laps & places
+    for (const r of this.racers) this.lapCheck(r);
+    this.updatePlaces();
+    if (this.started && this.time > 15 && pl.place === this.racers.length && this.racers.length > 1) pl.rs.wasLast = true;
+    // finish flow
+    if (pl.finished && !this.over) {
+      this.endT = (this.endT || 0) + dt;
+      if (this.endT > 4.5 || this.racers.every(r => r.finished)) this.finishRace();
+    }
+  }
+
+  lapCheck(r) {
+    const L = this.track.L;
+    const lap = Math.floor(r.dist / L);
+    if (r.finished) return;
+    if (lap > r.lap) {
+      if (lap >= 1) {
+        const lt = this.time - r.lapStart;
+        r.lapTimes.push(lt); r.bestLap = Math.min(r.bestLap, lt);
+        if (r.isPlayer) {
+          if (r.place !== 1 && this.mode !== 'tt') r.rs.ledAll = false;
+          if (lap < LAPS) { this.game.hud.banner(lap === LAPS - 1 ? 'FINAL LAP' : `LAP ${lap + 1}/${LAPS}`); this.game.audio.sfx(lap === LAPS - 1 ? 'final' : 'lap'); }
+        }
+      }
+      r.lap = lap; r.lapStart = this.time;
+      if (lap >= LAPS) {
+        r.finished = true; r.finishTime = this.time; r.place = ++this.finishCount;
+        r.order = this.finishCount;
+        if (r.isPlayer) this.onPlayerFinish();
+      }
+    }
+  }
+
+  onPlayerFinish() {
+    const pl = this.player;
+    this.game.hud.banner(this.mode === 'tt' ? 'TIME!' : pl.place === 1 ? 'VICTORY!' : `FINISHED ${pl.place}${['st', 'nd', 'rd'][pl.place - 1] || 'th'}`, true);
+    this.game.audio.sfx(pl.place <= 3 ? 'win' : 'finish');
+    this.autopilot = new AIDriver(pl, this, 0.9);
+    if (pl.place === 1 && this.mode !== 'tt') {
+      const second = this.racers.find(r => r !== pl && !r.finished && true) ;
+      // margin = time until next racer finishes (estimated)
+      let best = Infinity;
+      for (const r of this.racers) if (r !== pl) {
+        const rem = LAPS * this.track.L - r.dist;
+        best = Math.min(best, rem / Math.max(20, r.speed));
+      }
+      this.margin = best;
+    }
+  }
+
+  finishRace() {
+    this.over = true;
+    // estimate remaining finishers
+    const L = this.track.L;
+    const rest = this.racers.filter(r => !r.finished).map(r => ({ r, t: this.time + (LAPS * L - r.dist) / Math.max(25, r.top * 0.85) }));
+    rest.sort((a, b) => a.t - b.t).forEach(({ r, t }) => { r.finished = true; r.finishTime = t; r.place = ++this.finishCount; });
+    const order = [...this.racers].sort((a, b) => a.place - b.place);
+    const pl = this.player;
+    const res = {
+      mode: this.mode, cup: this.opts.cup, track: this.opts.track, clock: this.clock.id,
+      order: order.map((r, i) => ({ id: r.char.id, name: r.name, cls: r.clsId, time: r.finishTime, place: i + 1, pts: this.mode === 'tt' ? 0 : POINTS[i], isPlayer: r.isPlayer, color: r.char.color })),
+      place: pl.place, time: pl.finishTime, bestLap: pl.bestLap, lapTimes: pl.lapTimes,
+      st: this.st, rs: pl.rs, flags: this.flags,
+      margin: this.margin ?? 99,
+    };
+    res.st.bits += this.mode === 'tt' ? 150 : PLACE_BITS[pl.place - 1];
+    res.bits = Math.round(res.st.bits * this.clock.bits);
+    this.game.onRaceEnd(this, res);
+  }
+
+  updatePlaces() {
+    const key = r => r.finished ? 1e9 - r.order : r.dist;
+    const arr = [...this.racers].sort((a, b) => key(b) - key(a));
+    arr.forEach((r, i) => { if (!r.finished) r.place = i + 1; });
+    this.order = arr;
+  }
+
+  collide() {
+    const rs = this.racers;
+    for (let i = 0; i < rs.length; i++) for (let j = i + 1; j < rs.length; j++) {
+      const a = rs[i], b = rs[j];
+      if (a.state !== 'race' || b.state !== 'race') continue;
+      const ds = this.wrapDiff(b.dist, a.dist), dx = b.x - a.x;
+      if (Math.abs(ds) > 2.6 || Math.abs(dx) > 1.9 || Math.abs(a.h - b.h) > 1.6) continue;
+      const wa = a.clsId === 'bike' ? 0.75 : 1, wb = b.clsId === 'bike' ? 0.75 : 1;
+      const ox = 1.9 * (wa + wb) / 2 - Math.abs(dx);
+      if (ox <= 0) continue;
+      const s = Math.sign(dx) || 1;
+      const ma = a.mass, mb = b.mass, tot = ma + mb;
+      if (Math.abs(ds) < 1.6) {
+        a.x -= s * ox * (mb / tot); b.x += s * ox * (ma / tot);
+        a.vx -= s * 2.5 * (mb / tot); b.vx += s * 2.5 * (ma / tot);
+      } else {
+        // rear-end bump
+        const back = ds > 0 ? a : b, front = ds > 0 ? b : a;
+        if (back.speed > front.speed) { const dv = back.speed - front.speed; back.speed -= dv * 0.6; front.speed += dv * 0.25; }
+        back.dist -= 0.05;
+      }
+      if (a.isPlayer || b.isPlayer) { const me = a.isPlayer ? a : b; if (!me._bumpT || me._bumpT < this.time) { me._bumpT = this.time + 0.35; this.game.haptic(15, 90); this.fx.sparks(_v.addVectors(a.worldPos, b.worldPos).multiplyScalar(0.5), 0xffd080, 8); } }
+      for (const [x, y] of [[a, b], [b, a]]) if (x.staticT > 0 && x.shield && y.empT <= 0) { if (y.emp(1.2, x)) this.onItemHit(x, y, 'emp'); }
+    }
+  }
+
+  // ─── rendering ────────────────────────────────────────────────────────────
+  render(dt, aspect) {
+    const pl = this.player;
+    for (const r of this.racers) r.render(dt);
+    this.items.render(dt);
+    this.continuousFx(dt);
+    this.particles.update(dt);
+    this.updateCamera(dt, aspect);
+    this.track.sky.position.copy(this.camera.position);
+    this.track.stars.position.copy(this.camera.position);
+  }
+
+  continuousFx(dt) {
+    const P = this.particles;
+    for (const r of this.racers) {
+      if (r.state !== 'race') continue;
+      const near = r.isPlayer || r.worldPos.distanceToSquared(this.camera.position) < 120 * 120;
+      if (!near) continue;
+      const back = _v.copy(r.worldFwd).multiplyScalar(-1.6).add(r.worldPos);
+      if (r.drift.on && !r.air) {
+        const col = DRIFT_COLORS[r.drift.level];
+        _f.r.crossVectors(r.worldFwd, r.worldUp);
+        for (const side of [-1, 1]) {
+          _v2.copy(back).addScaledVector(_f.r, side * 0.9).addScaledVector(r.worldUp, 0.2);
+          P.emit(_v2, new THREE.Vector3((Math.random() - 0.5) * 6, Math.random() * 4, (Math.random() - 0.5) * 6).addScaledVector(r.worldFwd, -3), col, r.drift.level ? 0.7 : 0.35, 0.3, 12);
+        }
+      }
+      if (r.boostT > 0) {
+        for (let k = 0; k < 2; k++) P.emit(_v2.copy(back).addScaledVector(r.worldUp, 0.6), new THREE.Vector3((Math.random() - 0.5) * 3, Math.random() * 2, (Math.random() - 0.5) * 3).addScaledVector(r.worldFwd, -12), Math.random() < 0.5 ? 0xff8a1a : 0xffe08a, 1.1, 0.35);
+      }
+      if (r.empT > 0 && Math.random() < 0.7) P.emit(_v2.copy(r.worldPos).add(new THREE.Vector3((Math.random() - 0.5) * 3, Math.random() * 2.5, (Math.random() - 0.5) * 3)), new THREE.Vector3(0, 2, 0), 0xb98bff, 0.8, 0.2);
+      if (r.slipT > 0.2 && r.isPlayer && Math.random() < 0.5) P.emit(_v2.copy(r.worldPos).add(new THREE.Vector3((Math.random() - 0.5) * 5, Math.random() * 3, (Math.random() - 0.5) * 5)).addScaledVector(r.worldFwd, 4), _v.copy(r.worldFwd).multiplyScalar(-30), 0xcfeaff, 0.25, 0.3);
+      if (r.cometT > 0 || r.phaseT > 0) P.burst(r.worldPos, r.cometT > 0 ? 0xff9f40 : 0x9ffcff, 2, 4, 1.2, 0.3);
+    }
+  }
+
+  updateCamera(dt, aspect) {
+    const pl = this.player, cam = this.camera;
+    const tr = this.track;
+    tr.frame(pl.dist, _f);
+    const up = _f.u;
+    const spdN = clamp(pl.speed / pl.top, 0, 1.5);
+    let pos, look;
+    const base = pl.worldPos;
+    if (this.camMode === 'iso') {
+      // high, track-aligned isometric angle
+      const side = _f.r;
+      pos = _v.copy(base).addScaledVector(_f.t, -17 - spdN * 4).addScaledVector(side, -9).add(new THREE.Vector3(0, 24, 0));
+      look = _v2.copy(base).addScaledVector(_f.t, 10);
+      this.fov = damp(this.fov, 50, 3, dt);
+    } else {
+      // over-the-shoulder chase, blended between car heading and track heading for stability
+      const fwd = new THREE.Vector3().copy(_f.t).lerp(pl.worldFwd, pl.spinT > 0 ? 0 : 0.35).normalize();
+      const dist = 7.2 + spdN * 1.6;
+      pos = _v.copy(base).addScaledVector(fwd, this.lookBack ? dist : -dist).addScaledVector(up, 3.0 + (pl.air ? 0.6 : 0));
+      look = _v2.copy(base).addScaledVector(fwd, this.lookBack ? -8 : 7).addScaledVector(up, 1.4);
+      const boostF = pl.boostT > 0 ? 10 : 0;
+      this.fov = damp(this.fov, 68 + spdN * 10 + boostF, 4, dt);
+    }
+    // keep camera above the road surface
+    if (!this.camInit) { this.camPos.copy(pos); this.camLook.copy(look); this.camInit = true; }
+    const k = this.camMode === 'iso' ? 5 : 9;
+    this.camPos.x = damp(this.camPos.x, pos.x, k, dt); this.camPos.y = damp(this.camPos.y, pos.y, k * 0.8, dt); this.camPos.z = damp(this.camPos.z, pos.z, k, dt);
+    if (pl.state === 'fall') { /* hold */ } else this.camLook.lerp(look, 1 - Math.exp(-14 * dt));
+    cam.position.copy(this.camPos);
+    if (this.shake > 0) { this.shake = Math.max(0, this.shake - dt * 2.5); cam.position.add(new THREE.Vector3((Math.random() - 0.5), (Math.random() - 0.5), (Math.random() - 0.5)).multiplyScalar(this.shake * 0.9)); }
+    cam.up.copy(this.camMode === 'iso' ? new THREE.Vector3(0, 1, 0) : up);
+    cam.lookAt(this.camLook);
+    const portrait = aspect < 1.25;
+    cam.fov = this.fov + (portrait ? 10 : 0);
+    cam.aspect = aspect;
+    cam.updateProjectionMatrix();
+  }
+
+  dispose() {
+    this.items.dispose();
+    for (const r of this.racers) r.dispose();
+    this.particles.dispose(this.scene);
+    this.track.dispose(this.scene);
+    this.scene.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+  }
+}
+
+function kindName(k) { return { plasma: 'PLASMA', trap: 'TRAP', emp: 'EMP', melee: 'MELEE', comet: 'COMET' }[k] || k.toUpperCase(); }
+function aiUpgrades(clock) { const l = clock; return { engine: [0, 0, 2][l], turbo: l, grip: l, armor: l, capacitor: l }; }
+export function newRaceStats() {
+  return { driftBoosts: 0, drift1: 0, drift2: 0, drift3: 0, slips: 0, pads: 0, air: 0, lands: 0, plasmaHits: 0, trapHits: 0, empHits: 0, blocks: 0, surges: 0, fusions: 0, fuseMask: 0, meleeHits: 0, knockoffs: 0, evades: 0, distance: 0, rockets: 0, itemsUsed: 0, bits: 0 };
+}
+
+// ─── effects / feedback ────────────────────────────────────────────────────
+function makeFx(race) {
+  const game = race.game, P = race.particles;
+  const near = r => r.isPlayer || r.worldPos.distanceTo(race.camera.position) < 90;
+  const vol = r => r.isPlayer ? 1 : clamp(1 - r.worldPos.distanceTo(race.camera.position) / 90, 0, 0.6);
+  return {
+    text(t, c) { game.hud.pop(t, c); },
+    sparks(pos, color, n) { P.burst(pos, color, n, 10, 0.6, 0.4, 18); },
+    boost(r) { if (r.isPlayer) { game.audio.sfx('boost'); game.haptic(25, 120); } },
+    block(r, by) { race.onBlock(r); if (near(r)) { P.burst(r.worldPos, 0x4dfff3, 30, 12, 0.9, 0.5); game.audio.sfx('block', vol(r)); } if (r.isPlayer) game.hud.pop('BLOCKED', '#4dfff3'); },
+    hit(r, by, kind) {
+      if (near(r)) { P.burst(_v.copy(r.worldPos).addScaledVector(r.worldUp, 1), 0xff7a3a, 40, 16, 1.0, 0.6, 10); P.burst(r.worldPos, 0xffffff, 10, 8, 1.6, 0.25); game.audio.sfx('hit', vol(r)); }
+      if (r.isPlayer) { race.shake = 1; game.haptic(120, 255); }
+    },
+    emp(r) { if (near(r)) { P.burst(_v.copy(r.worldPos).addScaledVector(r.worldUp, 1), 0xb98bff, 30, 10, 0.8, 0.5); game.audio.sfx('zap', vol(r)); } if (r.isPlayer) { race.shake = 0.5; game.haptic(80, 180); game.hud.glitch(0.6); } },
+    zap(r) { P.burst(r.worldPos, 0xb98bff, 16, 8, 0.7, 0.4); },
+    fall(r) { if (near(r)) { P.burst(r.worldPos, r.neonColor, 50, 9, 0.8, 0.9, -4); game.audio.sfx('derez', vol(r)); } if (r.isPlayer) { game.hud.pop('DEREZZED', '#ff5060'); game.haptic(150, 200); } },
+    respawn(r) { P.burst(r.worldPos, 0xffffff, 30, 6, 0.8, 0.6, -6); },
+    melee(a, t, charged) {
+      const mid = _v.addVectors(a.worldPos, t.worldPos).multiplyScalar(0.5).addScaledVector(a.worldUp, 0.8);
+      P.burst(mid, 0xffc060, charged ? 70 : 40, charged ? 22 : 16, 0.8, 0.5, 20);
+      P.burst(mid, 0xffffff, 12, 10, 1.4, 0.2);
+      if (near(a) || near(t)) game.audio.sfx('clang', Math.max(vol(a), vol(t)));
+      if (a.isPlayer) { game.hud.pop(charged ? 'OVERDRIVE SLAM!' : 'SCRAP!', '#ffb340'); race.shake = 0.6; game.haptic(70, 255); }
+      if (t.isPlayer) { race.shake = 0.8; game.haptic(90, 255); }
+    },
+    dash(r) { if (r.isPlayer) { game.audio.sfx('dash'); game.haptic(30, 140); } P.burst(r.worldPos, 0xbfefff, 14, 8, 0.6, 0.3); },
+    driftStart(r) { if (r.isPlayer) game.audio.sfx('driftstart'); },
+    driftLevel(r, lv) { if (r.isPlayer) { game.audio.sfx('tick', 1, lv); game.haptic(12 + lv * 8, 120 + lv * 40); } },
+    wall(r, side, impact) {
+      if (near(r)) { _f.r.crossVectors(r.worldFwd, r.worldUp); P.burst(_v.copy(r.worldPos).addScaledVector(_f.r, side * 1.1).addScaledVector(r.worldUp, 0.5), 0xffd080, Math.min(30, 4 + impact), 9, 0.5, 0.35, 20); }
+      if (r.isPlayer) { game.audio.sfx('scrape', clamp(impact / 30, 0.2, 1)); game.haptic(20 + Math.min(60, impact * 2), 160); if (impact > 15) race.shake = 0.35; }
+    },
+    launch(r) { if (r.isPlayer) game.audio.sfx('launch'); },
+    capsule(r, c) { if (near(r)) P.burst(r.worldPos, race.cup.pal.a, 24, 9, 0.7, 0.5); },
+    fire(r, kind) { if (near(r)) game.audio.sfx(kind === 'plasma' ? 'shoot' : kind === 'emp' ? 'zap' : 'drop', vol(r)); },
+    shieldUp(r) { if (r.isPlayer) game.audio.sfx('shield'); },
+    surge(r) { if (near(r)) P.burst(r.worldPos, 0xff8a1a, 30, 12, 1.0, 0.4); },
+    empBlast(r, radius, big) {
+      race.items.addRing(_v.copy(r.worldPos).addScaledVector(r.worldUp, 0.6), big ? 0xa46bff : 0xb98bff, Math.min(radius, 40), big ? 0.9 : 0.5);
+      P.burst(r.worldPos, 0xd0b0ff, big ? 120 : 60, big ? 30 : 18, 1.0, 0.6);
+      if (near(r)) game.audio.sfx('emp', vol(r));
+      if (r.isPlayer) { race.shake = 0.4; game.haptic(90, 200); }
+    },
+    empField(p) { game.audio.sfx('zap', 0.6); },
+    beam(r, t) {
+      const a = _v.copy(r.worldPos).addScaledVector(r.worldUp, 1).clone();
+      const b = t ? t.worldPos.clone().addScaledVector(t.worldUp, 1) : a.clone().addScaledVector(r.worldFwd, 100);
+      race.items.addBeam(a, b, 0x9fb4ff);
+      game.audio.sfx('laser', vol(r));
+    },
+    explode(pos, color) { P.burst(pos, color, 40, 14, 1.0, 0.55, 8); },
+    scramble() { game.hud.glitch(2.5); },
+  };
+}
