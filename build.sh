@@ -20,7 +20,7 @@ OUT=build
 rm -rf $OUT && mkdir -p $OUT/classes $OUT/dex $OUT/assets/www
 
 echo "[1/7] bundle game"
-npx esbuild src/main.js --bundle --minify --format=iife --target=chrome110 --outfile=www/game.js --log-level=warning
+tools/bundle.sh --minify
 cp www/index.html www/game.js $OUT/assets/www/
 
 echo "[2/7] icon"

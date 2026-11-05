@@ -34,6 +34,14 @@ export class UI {
     this.after = null;
     this.focusFirst();
     this.update3d();
+    this.prefetch();
+  }
+  // start rendering a cup's score as soon as it's likely to be raced
+  prefetch() {
+    const s = this.screen, a = this.game.audio;
+    if (!a.ctx) return;
+    if (s === 'tracks') a.prepareCup(CUPS[this.sel.cup]);
+    else if (s === 'cups') a.prepareCup(CUPS[Math.max(0, CUPS.findIndex((c, i) => !this.cupUnlocked(i + 1)) )] || CUPS[0]);
   }
   refresh() {
     const f = this.focusEl && this.focusEl.dataset.key;
@@ -146,7 +154,7 @@ export class UI {
         this.show(s.mode === 'cup' ? 'cups' : 'tracks'); break;
       case 'clock': s.clock = +ds.v; this.p.lastClock = s.clock; this.refresh(); break;
       case 'cup': if (!this.cupUnlocked(+ds.v)) return; s.cup = +ds.v; g.startCup(s.cup, s.clock, s.char, s.cls); break;
-      case 'tcup': s.cup = +ds.v; this.refresh(); break;
+      case 'tcup': s.cup = +ds.v; this.refresh(); this.prefetch(); break;
       case 'track': s.track = +ds.v; g.startSingle(s.mode, s.cup, s.track, s.clock, s.char, s.cls); break;
       case 'gcls': s.gcls = ds.v; this.refresh(); break;
       case 'gtab': s.gtab = ds.v; this.refresh(); break;
@@ -174,7 +182,8 @@ export class UI {
     st[k] = v;
     this.game.saveSettings();
     if (k === 'musicVol' || k === 'sfxVol') this.game.audio.applyVolumes();
-    if (k === 'quality') this.game.applyQuality();
+    if (k === 'fpsCap') st[k] = +v;
+    if (k === 'quality' || k === 'dynamicRes') this.game.applyQuality();
     this.game.input.applyLayout();
   }
 
@@ -389,7 +398,7 @@ export class UI {
 
   r_settings() {
     const st = this.game.settings;
-    const opt = (k, v, label) => `<button class="tab ${st[k] === v ? 'selected' : ''}" data-act="set" data-k="${k}" data-v="${v}" data-key="s_${k}_${v}">${label}</button>`;
+    const opt = (k, v, label) => `<button class="tab ${String(st[k]) === String(v) ? 'selected' : ''}" data-act="set" data-k="${k}" data-v="${v}" data-key="s_${k}_${v}">${label}</button>`;
     const sl = (k, min, max, step, label) => `<label class="sl"><span>${label}</span><input type="range" data-set="${k}" min="${min}" max="${max}" step="${step}" value="${st[k]}" data-f="1" data-key="r_${k}"></label>`;
     return `${this.hdr('SETTINGS')}<div class="settings scroll">
       <div class="srow"><span>STEERING</span>${opt('steerMode', 'stick', 'STICK')}${opt('steerMode', 'buttons', 'BUTTONS')}${opt('steerMode', 'tilt', 'TILT')}</div>
@@ -398,7 +407,9 @@ export class UI {
       <div class="srow"><span>HANDEDNESS</span>${opt('leftHanded', false, 'RIGHT')}${opt('leftHanded', true, 'LEFT')}</div>
       ${sl('buttonScale', 0.7, 1.4, 0.05, 'BUTTON SIZE')}${sl('buttonOpacity', 0.2, 1, 0.05, 'BUTTON OPACITY')}
       <div class="srow"><span>CAMERA</span>${opt('camera', 'chase', 'OVER-SHOULDER')}${opt('camera', 'iso', 'ISOMETRIC')}</div>
-      <div class="srow"><span>GRAPHICS</span>${opt('quality', 'auto', 'AUTO')}${opt('quality', 'high', 'HIGH')}${opt('quality', 'balanced', 'BALANCED')}${opt('quality', 'perf', 'PERFORMANCE')}</div>
+      <div class="srow"><span>UPSCALER</span>${opt('quality', 'quality', 'QUALITY')}${opt('quality', 'balanced', 'BALANCED')}${opt('quality', 'performance', 'PERFORMANCE')}${opt('quality', 'native', 'NATIVE')}</div>
+      <div class="srow"><span>DYNAMIC RES</span>${opt('dynamicRes', true, 'ON')}${opt('dynamicRes', false, 'OFF')}</div>
+      <div class="srow"><span>FRAME RATE</span>${opt('fpsCap', '60', '60 FPS')}${opt('fpsCap', '30', '30 FPS')}</div>
       <div class="srow"><span>HAPTICS</span>${opt('haptics', true, 'ON')}${opt('haptics', false, 'OFF')}</div>
       <div class="srow"><span>SHOW FPS</span>${opt('showFps', true, 'ON')}${opt('showFps', false, 'OFF')}</div>
       ${sl('musicVol', 0, 1, 0.05, 'MUSIC')}${sl('sfxVol', 0, 1, 0.05, 'EFFECTS')}

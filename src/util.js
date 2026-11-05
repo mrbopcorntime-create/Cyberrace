@@ -20,13 +20,14 @@ export function rgba(n, a) {
 }
 
 export function canvasTex(w, h, draw, opts = {}) {
-  const c = document.createElement('canvas');
-  c.width = w; c.height = h;
+  const c = document.createElement('canvas'), sc = opts.scale || 1;
+  c.width = w * sc; c.height = h * sc;
   const g = c.getContext('2d');
+  if (sc !== 1) g.scale(sc, sc);
   draw(g, w, h);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
-  t.anisotropy = opts.aniso || 4;
+  t.anisotropy = opts.aniso || 8;
   if (opts.repeat) { t.wrapS = t.wrapT = THREE.RepeatWrapping; }
   if (opts.nearest) { t.magFilter = THREE.NearestFilter; }
   t.needsUpdate = true;
@@ -70,7 +71,7 @@ export function mergeStatic(root, keep = () => false) {
     if (o === root || !o.isMesh || o.isInstancedMesh || keep(o)) return;
     const m = o.material;
     if (Array.isArray(m) || m.map || m.wireframe) return;
-    const key = [m.type, m.color && m.color.getHex(), m.opacity, m.transparent, m.blending, m.side, m.shininess].join('|');
+    const key = [m.type, m.color && m.color.getHex(), m.opacity, m.transparent, m.blending, m.side, m.shininess, m.roughness, m.metalness, m.normalMap && m.normalMap.uuid, m.color && (m.color.r > 1 || m.color.g > 1 || m.color.b > 1 ? m.color.r + ',' + m.color.g + ',' + m.color.b : '')].join('|');
     let g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
     for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(k)) g.deleteAttribute(k);
     if (!g.attributes.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));

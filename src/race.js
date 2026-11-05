@@ -29,7 +29,21 @@ export class Race {
     this.scene.add(new THREE.HemisphereLight(0x9fc8ff, 0x201030, 1.4));
     const dl = new THREE.DirectionalLight(0xffffff, 1.6); dl.position.set(0.3, 1, 0.4); this.scene.add(dl);
     const rim = new THREE.DirectionalLight(this.cup.pal.a, 1.2); rim.position.set(-0.5, 0.3, -1); this.scene.add(rim);
-    this.particles = new Particles(this.scene, quality > 0 ? 2000 : 1100);
+    const preset = game.pipeline.preset;
+    this.pMul = preset.particles;
+    this.particles = new Particles(this.scene, (quality > 0 ? 2000 : 1100) * this.pMul);
+    this.particles.mul = this.pMul;
+    this.shadows = game.renderer.shadowMap.enabled;
+    if (this.shadows) {
+      const sun = this.sun = new THREE.DirectionalLight(0xffffff, 0.9);
+      sun.castShadow = true; sun.shadow.mapSize.set(preset.shadowMap, preset.shadowMap);
+      Object.assign(sun.shadow.camera, { left: -38, right: 38, top: 38, bottom: -38, near: 1, far: 220 });
+      sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.03;
+      this.scene.add(sun, sun.target);
+      this.sunDir = new THREE.Vector3(0.35, 1, 0.22).normalize();
+      const recv = new THREE.Mesh(this.track.roadGeo, new THREE.ShadowMaterial({ opacity: 0.62, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+      recv.receiveShadow = true; this.scene.add(recv);
+    }
     this.items = new ItemSystem(this);
 
     // roster
@@ -79,16 +93,18 @@ export class Race {
   // ─── event hooks (player stats + feed) ─────────────────────────────────────
   onDriftBoost(r, lv) { if (r.isPlayer) { this.st.driftBoosts++; this.st['drift' + lv]++; this.st.bits += lv * 10; } }
   onLand(r, airT, perfect) {
+    if (r.isPlayer) this.game.audio.play('land', { vol: Math.min(1.2, 0.5 + airT) }); else if (r.worldPos.distanceTo(this.camera.position) < 60) this.game.audio.play('land', { pos: r.worldPos, vol: 0.7 });
     if (!r.isPlayer) return;
     this.st.air += airT;
     if (airT >= 1.5) this.flag('air2');
     if (perfect) { this.st.lands++; this.st.bits += 15; this.fx.text('PERFECT LANDING', '#7affff'); }
     this.game.haptic(20, 120);
   }
-  onPad(r) { if (r.isPlayer) this.st.pads++; }
-  onSlip(r) { if (r.isPlayer) { this.st.slips++; this.st.bits += 10; this.fx.text('SLIPSTREAM', '#bfe8ff'); } }
+  onPad(r) { if (r.isPlayer) { this.st.pads++; this.game.audio.play('pad'); } }
+  onSlip(r) { if (r.isPlayer) { this.game.audio.play('slip'); this.st.slips++; this.st.bits += 10; this.fx.text('SLIPSTREAM', '#bfe8ff'); } }
   onPickup(r, id) { if (r.isPlayer) this.game.audio.sfx('pickup'); }
   onItemUse(r, id) {
+    if (r.isPlayer || r.worldPos.distanceTo(this.player.worldPos) < 30) this.game.audio.combat();
     if (!r.isPlayer) return;
     this.st.itemsUsed++;
     if (id === 'surge') this.st.surges++;
@@ -100,6 +116,7 @@ export class Race {
   }
   onItemHit(owner, victim, kind, tag) {
     if (!owner) return;
+    if (owner.isPlayer || victim.isPlayer) this.game.audio.combat();
     if (owner.isPlayer) {
       if (kind === 'plasma') this.st.plasmaHits++;
       if (kind === 'trap') this.st.trapHits++;
@@ -110,6 +127,7 @@ export class Race {
     } else if (victim.isPlayer) this.feedMsg(`${owner.name} ▸ ${kindName(kind)}`, '#ff6080');
   }
   onMelee(att, tgt, drifting) {
+    if (att.isPlayer || tgt.isPlayer) this.game.audio.combat();
     if (att.isPlayer) { this.st.meleeHits++; this.st.bits += 15; if (drifting) this.flag('tailwhip'); }
   }
   onKnockoff(att, victim) {
@@ -135,7 +153,7 @@ export class Race {
       if (!thr) this.rocket.pressedAt = null;
       const cd = Math.ceil(-this.time);
       const pcd = Math.ceil(-prevT);
-      if (cd !== pcd && cd >= 0 && cd <= 3) { game.hud.countdown(cd === 0 ? 'GO!' : String(cd)); game.audio.sfx(cd === 0 ? 'go' : 'beep'); }
+      if (cd !== pcd && cd >= 0 && cd <= 3) { game.hud.countdown(cd === 0 ? 'GO!' : String(cd)); game.audio.countdown(cd); }
       if (this.time >= 0) {
         this.started = true;
         const pa = this.rocket.pressedAt;
@@ -178,7 +196,7 @@ export class Race {
         r.lapTimes.push(lt); r.bestLap = Math.min(r.bestLap, lt);
         if (r.isPlayer) {
           if (r.place !== 1 && this.mode !== 'tt') r.rs.ledAll = false;
-          if (lap < LAPS) { this.game.hud.banner(lap === LAPS - 1 ? 'FINAL LAP' : `LAP ${lap + 1}/${LAPS}`); this.game.audio.sfx(lap === LAPS - 1 ? 'final' : 'lap'); }
+          if (lap < LAPS) { this.game.hud.banner(lap === LAPS - 1 ? 'FINAL LAP' : `LAP ${lap + 1}/${LAPS}`); if (lap !== LAPS - 1) this.game.audio.sfx('lap'); }
         }
       }
       r.lap = lap; r.lapStart = this.time;
@@ -193,7 +211,7 @@ export class Race {
   onPlayerFinish() {
     const pl = this.player;
     this.game.hud.banner(this.mode === 'tt' ? 'TIME!' : pl.place === 1 ? 'VICTORY!' : `FINISHED ${pl.place}${['st', 'nd', 'rd'][pl.place - 1] || 'th'}`, true);
-    this.game.audio.sfx(pl.place <= 3 ? 'win' : 'finish');
+    this.game.audio.stinger(this.mode === 'tt' || pl.place <= 3);
     this.autopilot = new AIDriver(pl, this, 0.9);
     if (pl.place === 1 && this.mode !== 'tt') {
       const second = this.racers.find(r => r !== pl && !r.finished && true) ;
@@ -261,8 +279,19 @@ export class Race {
   }
 
   // ─── rendering ────────────────────────────────────────────────────────────
+  // meshes with their own motion → per-object motion vectors in the velocity pass
+  dynamicObjects() {
+    if (!this._dynRacers) { this._dynRacers = []; for (const r of this.racers) r.root.traverse(o => { if (o.isMesh && o.userData.dyn) this._dynRacers.push(o); }); }
+    const out = this._dynRacers.slice();
+    const add = m => m.traverse(o => { if (o.isMesh) { o.userData.dyn = true; out.push(o); } });
+    for (const p of this.items.projectiles) add(p.mesh);
+    for (const h of this.track.hazards) if (h.type === 'barrier') add(h.mesh);
+    return out;
+  }
+
   render(dt, aspect) {
     const pl = this.player;
+    if (this.sun) { this.sun.position.copy(pl.worldPos).addScaledVector(this.sunDir, 90); this.sun.target.position.copy(pl.worldPos); this.sun.target.updateMatrixWorld(); }
     for (const r of this.racers) r.render(dt);
     this.items.render(dt);
     this.continuousFx(dt);
@@ -282,13 +311,13 @@ export class Race {
       if (r.drift.on && !r.air) {
         const col = DRIFT_COLORS[r.drift.level];
         _f.r.crossVectors(r.worldFwd, r.worldUp);
-        for (const side of [-1, 1]) {
+        for (let pm = 0; pm < this.pMul; pm++) for (const side of [-1, 1]) {
           _v2.copy(back).addScaledVector(_f.r, side * 0.9).addScaledVector(r.worldUp, 0.2);
           P.emit(_v2, new THREE.Vector3((Math.random() - 0.5) * 6, Math.random() * 4, (Math.random() - 0.5) * 6).addScaledVector(r.worldFwd, -3), col, r.drift.level ? 0.7 : 0.35, 0.3, 12);
         }
       }
       if (r.boostT > 0) {
-        for (let k = 0; k < 2; k++) P.emit(_v2.copy(back).addScaledVector(r.worldUp, 0.6), new THREE.Vector3((Math.random() - 0.5) * 3, Math.random() * 2, (Math.random() - 0.5) * 3).addScaledVector(r.worldFwd, -12), Math.random() < 0.5 ? 0xff8a1a : 0xffe08a, 1.1, 0.35);
+        for (let k = 0; k < 2 * this.pMul; k++) P.emit(_v2.copy(back).addScaledVector(r.worldUp, 0.6), new THREE.Vector3((Math.random() - 0.5) * 3, Math.random() * 2, (Math.random() - 0.5) * 3).addScaledVector(r.worldFwd, -12), Math.random() < 0.5 ? 0xff8a1a : 0xffe08a, 1.1, 0.35);
       }
       if (r.empT > 0 && Math.random() < 0.7) P.emit(_v2.copy(r.worldPos).add(new THREE.Vector3((Math.random() - 0.5) * 3, Math.random() * 2.5, (Math.random() - 0.5) * 3)), new THREE.Vector3(0, 2, 0), 0xb98bff, 0.8, 0.2);
       if (r.slipT > 0.2 && r.isPlayer && Math.random() < 0.5) P.emit(_v2.copy(r.worldPos).add(new THREE.Vector3((Math.random() - 0.5) * 5, Math.random() * 3, (Math.random() - 0.5) * 5)).addScaledVector(r.worldFwd, 4), _v.copy(r.worldFwd).multiplyScalar(-30), 0xcfeaff, 0.25, 0.3);
@@ -321,7 +350,8 @@ export class Race {
     }
     // keep camera above the road surface
     if (!this.camInit) { this.camPos.copy(pos); this.camLook.copy(look); this.camInit = true; }
-    const k = this.camMode === 'iso' ? 5 : 9;
+    // follow stiffness scales with speed so the chase cam doesn't trail the car at boost speeds
+    const k = this.camMode === 'iso' ? 5 : 9 + Math.abs(pl.speed) * 0.3;
     this.camPos.x = damp(this.camPos.x, pos.x, k, dt); this.camPos.y = damp(this.camPos.y, pos.y, k * 0.8, dt); this.camPos.z = damp(this.camPos.z, pos.z, k, dt);
     if (pl.state === 'fall') { /* hold */ } else this.camLook.lerp(look, 1 - Math.exp(-14 * dt));
     cam.position.copy(this.camPos);
@@ -354,53 +384,56 @@ function makeFx(race) {
   const game = race.game, P = race.particles;
   const near = r => r.isPlayer || r.worldPos.distanceTo(race.camera.position) < 90;
   const vol = r => r.isPlayer ? 1 : clamp(1 - r.worldPos.distanceTo(race.camera.position) / 90, 0, 0.6);
+  const A = game.audio, at = (name, r, o = {}) => A.play(name, r.isPlayer ? o : { ...o, pos: r.worldPos });
   return {
     text(t, c) { game.hud.pop(t, c); },
     sparks(pos, color, n) { P.burst(pos, color, n, 10, 0.6, 0.4, 18); },
-    boost(r) { if (r.isPlayer) { game.audio.sfx('boost'); game.haptic(25, 120); } },
-    block(r, by) { race.onBlock(r); if (near(r)) { P.burst(r.worldPos, 0x4dfff3, 30, 12, 0.9, 0.5); game.audio.sfx('block', vol(r)); } if (r.isPlayer) game.hud.pop('BLOCKED', '#4dfff3'); },
+    boost(r) { if (r.isPlayer) { A.play('boost'); game.haptic(25, 120); } },
+    block(r, by) { race.onBlock(r); if (near(r)) { P.burst(r.worldPos, 0x4dfff3, 30, 12, 0.9, 0.5); at('shield_block', r); } if (r.isPlayer) game.hud.pop('BLOCKED', '#4dfff3'); },
     hit(r, by, kind) {
-      if (near(r)) { P.burst(_v.copy(r.worldPos).addScaledVector(r.worldUp, 1), 0xff7a3a, 40, 16, 1.0, 0.6, 10); P.burst(r.worldPos, 0xffffff, 10, 8, 1.6, 0.25); game.audio.sfx('hit', vol(r)); }
+      if (near(r)) { P.burst(_v.copy(r.worldPos).addScaledVector(r.worldUp, 1), 0xff7a3a, 40, 16, 1.0, 0.6, 10); P.burst(r.worldPos, 0xffffff, 10, 8, 1.6, 0.25); at(kind === 'trap' ? 'trap_trigger' : 'plasma_impact', r); if (kind === 'trap') A.victimTrap(r); }
+      if (r.isPlayer || (by && by.isPlayer)) A.duck('high', 0.08);
       if (r.isPlayer) { race.shake = 1; game.haptic(120, 255); }
     },
-    emp(r) { if (near(r)) { P.burst(_v.copy(r.worldPos).addScaledVector(r.worldUp, 1), 0xb98bff, 30, 10, 0.8, 0.5); game.audio.sfx('zap', vol(r)); } if (r.isPlayer) { race.shake = 0.5; game.haptic(80, 180); game.hud.glitch(0.6); } },
+    emp(r) { if (near(r)) { P.burst(_v.copy(r.worldPos).addScaledVector(r.worldUp, 1), 0xb98bff, 30, 10, 0.8, 0.5); at('zap', r); } if (r.isPlayer) { race.shake = 0.5; game.haptic(80, 180); game.hud.glitch(0.6); A.victimEmp(1.5); A.duck('high', 0.1); } },
     zap(r) { P.burst(r.worldPos, 0xb98bff, 16, 8, 0.7, 0.4); },
-    fall(r) { if (near(r)) { P.burst(r.worldPos, r.neonColor, 50, 9, 0.8, 0.9, -4); game.audio.sfx('derez', vol(r)); } if (r.isPlayer) { game.hud.pop('DEREZZED', '#ff5060'); game.haptic(150, 200); } },
-    respawn(r) { P.burst(r.worldPos, 0xffffff, 30, 6, 0.8, 0.6, -6); },
+    fall(r) { if (near(r)) { P.burst(r.worldPos, r.neonColor, 50, 9, 0.8, 0.9, -4); at('derez', r); } if (r.isPlayer) { game.hud.pop('DEREZZED', '#ff5060'); game.haptic(150, 200); } },
+    respawn(r) { P.burst(r.worldPos, 0xffffff, 30, 6, 0.8, 0.6, -6); if (r.isPlayer || near(r)) at('reentry', r); },
     melee(a, t, charged) {
       const mid = _v.addVectors(a.worldPos, t.worldPos).multiplyScalar(0.5).addScaledVector(a.worldUp, 0.8);
       P.burst(mid, 0xffc060, charged ? 70 : 40, charged ? 22 : 16, 0.8, 0.5, 20);
       P.burst(mid, 0xffffff, 12, 10, 1.4, 0.2);
-      if (near(a) || near(t)) game.audio.sfx('clang', Math.max(vol(a), vol(t)));
+      if (near(a) || near(t)) { A.play(charged ? 'melee_heavy' : 'melee', a.isPlayer || t.isPlayer ? {} : { pos: mid.clone() }); if (a.isPlayer || t.isPlayer) A.duck('high', 0.06); }
       if (a.isPlayer) { game.hud.pop(charged ? 'OVERDRIVE SLAM!' : 'SCRAP!', '#ffb340'); race.shake = 0.6; game.haptic(70, 255); }
       if (t.isPlayer) { race.shake = 0.8; game.haptic(90, 255); }
     },
-    dash(r) { if (r.isPlayer) { game.audio.sfx('dash'); game.haptic(30, 140); } P.burst(r.worldPos, 0xbfefff, 14, 8, 0.6, 0.3); },
-    driftStart(r) { if (r.isPlayer) game.audio.sfx('driftstart'); },
-    driftLevel(r, lv) { if (r.isPlayer) { game.audio.sfx('tick', 1, lv); game.haptic(12 + lv * 8, 120 + lv * 40); } },
+    dash(r) { if (r.isPlayer) { A.play('dash'); game.haptic(30, 140); } P.burst(r.worldPos, 0xbfefff, 14, 8, 0.6, 0.3); },
+    driftStart(r) { if (r.isPlayer) A.play('drift_start'); },
+    driftLevel(r, lv) { if (r.isPlayer) { A.play('tick' + lv); game.haptic(12 + lv * 8, 120 + lv * 40); } },
     wall(r, side, impact) {
       if (near(r)) { _f.r.crossVectors(r.worldFwd, r.worldUp); P.burst(_v.copy(r.worldPos).addScaledVector(_f.r, side * 1.1).addScaledVector(r.worldUp, 0.5), 0xffd080, Math.min(30, 4 + impact), 9, 0.5, 0.35, 20); }
-      if (r.isPlayer) { game.audio.sfx('scrape', clamp(impact / 30, 0.2, 1)); game.haptic(20 + Math.min(60, impact * 2), 160); if (impact > 15) race.shake = 0.35; }
+      if (r.isPlayer) { A.play('wall', { vol: clamp(impact / 30, 0.2, 1), pan: side * 0.6 }); game.haptic(20 + Math.min(60, impact * 2), 160); if (impact > 15) race.shake = 0.35; }
     },
-    launch(r) { if (r.isPlayer) game.audio.sfx('launch'); },
+    launch(r) { if (r.isPlayer || near(r)) at('jump', r); },
     capsule(r, c) { if (near(r)) P.burst(r.worldPos, race.cup.pal.a, 24, 9, 0.7, 0.5); },
-    fire(r, kind) { if (near(r)) game.audio.sfx(kind === 'plasma' ? 'shoot' : kind === 'emp' ? 'zap' : 'drop', vol(r)); },
-    shieldUp(r) { if (r.isPlayer) game.audio.sfx('shield'); },
-    surge(r) { if (near(r)) P.burst(r.worldPos, 0xff8a1a, 30, 12, 1.0, 0.4); },
+    fire(r, kind) { if (near(r)) at(kind === 'plasma' ? 'plasma_fire' : kind === 'emp' ? 'zap' : 'trap_lay', r); },
+    shieldUp(r) { if (r.isPlayer || near(r)) at('shield_up', r); },
+    surge(r) { if (near(r)) { P.burst(r.worldPos, 0xff8a1a, 60, 12, 1.0, 0.4); at('surge', r); } if (r.isPlayer) A.duck('surge', Math.max(0.5, r.boostT - 0.3)); },
     empBlast(r, radius, big) {
       race.items.addRing(_v.copy(r.worldPos).addScaledVector(r.worldUp, 0.6), big ? 0xa46bff : 0xb98bff, Math.min(radius, 40), big ? 0.9 : 0.5);
       P.burst(r.worldPos, 0xd0b0ff, big ? 120 : 60, big ? 30 : 18, 1.0, 0.6);
-      if (near(r)) game.audio.sfx('emp', vol(r));
+      if (near(r)) at('emp', r);
+      if (r.isPlayer || near(r)) A.duck('high', 0.1);
       if (r.isPlayer) { race.shake = 0.4; game.haptic(90, 200); }
     },
-    empField(p) { game.audio.sfx('zap', 0.6); },
+    empField(p) { A.play('emp', { pos: p.mesh.position.clone(), vol: 0.7 }); },
     beam(r, t) {
       const a = _v.copy(r.worldPos).addScaledVector(r.worldUp, 1).clone();
       const b = t ? t.worldPos.clone().addScaledVector(t.worldUp, 1) : a.clone().addScaledVector(r.worldFwd, 100);
       race.items.addBeam(a, b, 0x9fb4ff);
-      game.audio.sfx('laser', vol(r));
+      at('laser', r);
     },
-    explode(pos, color) { P.burst(pos, color, 40, 14, 1.0, 0.55, 8); },
+    explode(pos, color) { P.burst(pos, color, 80, 14, 1.0, 0.55, 8); A.play('explode', { pos: pos.clone() }); if (pos.distanceTo(race.player.worldPos) < 20) A.duck('high', 0.06); },
     scramble() { game.hud.glitch(2.5); },
   };
 }

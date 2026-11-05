@@ -4,3 +4,4 @@ build/
 keystore/
 *.apk
 *.jks
+src/audio/worker.gen.txt

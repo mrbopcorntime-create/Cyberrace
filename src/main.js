@@ -1,16 +1,14 @@
 import * as THREE from 'three';
-import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
-import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { Pipeline, PRESETS, installPCSS } from './render/pipeline.js';
+import { MIP_BIAS } from './track.js';
 import { CHARACTERS, CUPS, CLOCKS, STARTERS, PAINTS, NEONS, POINTS } from './data.js';
 import { Race } from './race.js';
 import { Input } from './input.js';
-import { Audio } from './audio.js';
+import { Audio } from './audio/index.js';
 import { HUD } from './hud.js';
 import { UI } from './ui.js';
 import { Achievements, loadProfile, saveProfile, loadSettings, saveSettings, defaultProfile, mergeRace } from './save.js';
-import { buildVehicle } from './models.js';
+import { buildVehicle, setEnvironment } from './models.js';
 import { clamp } from './util.js';
 
 const TIPS = [
@@ -26,11 +24,6 @@ const TIPS = [
   'Quads shrug off shoves and hit hardest. Bikes are fastest but get bullied.',
 ];
 
-const QUALITY = {
-  high: { pr: 1.75, bloom: true, q: 1, name: 'HIGH' },
-  balanced: { pr: 1.35, bloom: true, q: 1, name: 'BALANCED' },
-  perf: { pr: 1.0, bloom: false, q: 0, name: 'PERFORMANCE' },
-};
 
 class Menu3D {
   constructor(game) {
@@ -60,6 +53,10 @@ class Menu3D {
     for (let i = 0; i < 80; i++) { im.getMatrixAt(i, m); const p = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3(); m.decompose(p, q, sc); m.makeScale(sc.x * 1.02, 1, sc.z * 1.02).setPosition(p.x, sc.y, p.z); edges.setMatrixAt(i, m); }
     s.add(edges);
     this.holder = new THREE.Group(); s.add(this.holder);
+    this.sun = new THREE.DirectionalLight(0xffffff, 1.2); this.sun.position.set(2, 8, 3); this.sun.castShadow = true;
+    this.sun.shadow.mapSize.set(2048, 2048); Object.assign(this.sun.shadow.camera, { left: -5, right: 5, top: 5, bottom: -5, near: 1, far: 20 }); this.sun.shadow.bias = -0.0008;
+    s.add(this.sun);
+    const sh = new THREE.Mesh(new THREE.CircleGeometry(3.2, 64), new THREE.ShadowMaterial({ opacity: 0.55, depthWrite: false })); sh.rotation.x = -Math.PI / 2; sh.position.y = 0.015; sh.receiveShadow = true; s.add(sh);
     this.t = 0; this.offset = 0; this.targetOffset = 0;
   }
   showVehicle(cls, look, ch) {
@@ -72,6 +69,7 @@ class Menu3D {
     this.holder.add(v.root);
     this.ring.material.color.setHex(look.neon);
   }
+  dynamic() { const out = []; this.holder.traverse(o => { if (o.isMesh && o.userData.dyn) out.push(o); }); return out; }
   setView(v) { this.targetOffset = v === 'right' ? 1 : v === 'away' ? 2 : 0; }
   render(renderer, dt, aspect) {
     this.t += dt;
@@ -97,10 +95,13 @@ class Game {
     this.profile = loadProfile();
     this.platform = window.NCRNative ? (() => { try { return NCRNative.platform(); } catch (_) { return 'Android'; } })() : 'Web';
     this.canvas = document.getElementById('c');
+    installPCSS();
     this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: false, powerPreference: 'high-performance', stencil: false });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.15;
+    this.renderer.toneMapping = THREE.NoToneMapping;      // tonemapping happens in the pipeline, after upscaling
+    this.renderer.shadowMap.type = THREE.BasicShadowMap;  // raw depth → PCSS in shader
+    this.pipeline = new Pipeline(this.renderer);
+    this._buildEnvironment();
     this.audio = new Audio(this);
     this.input = new Input(this);
     this.hud = new HUD(this, document.getElementById('hud'));
@@ -110,7 +111,6 @@ class Game {
     this.input.buildTouch(document.getElementById('touch'));
     this.input.onNav = (d, src) => this.onNav(d, src);
     this.toasts = document.getElementById('toasts');
-    this.qLevel = this.settings.quality === 'auto' ? 'high' : this.settings.quality;
     this.applyQuality();
     window.addEventListener('resize', () => this.resize());
     this.resize();
@@ -128,32 +128,36 @@ class Game {
   }
 
   // ─── rendering setup ──────────────────────────────────────────────────────
-  qualityName() { return QUALITY[this.qLevel].name + (this.settings.quality === 'auto' ? ' (AUTO)' : ''); }
-  get quality() { return QUALITY[this.qLevel].q; }
+  _buildEnvironment() {
+    // procedural neon "studio" for PBR reflections (PMREM-filtered)
+    const env = new THREE.Scene();
+    env.add(new THREE.Mesh(new THREE.BoxGeometry(20, 10, 20), new THREE.MeshBasicMaterial({ color: 0x080a16, side: THREE.BackSide })));
+    const panel = (c, x, y, z, w, h, ry = 0) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: new THREE.Color(c).multiplyScalar(3), side: THREE.DoubleSide })); m.position.set(x, y, z); m.rotation.y = ry; env.add(m); };
+    panel(0x00e5ff, -9.8, 2, 0, 14, 1.2, Math.PI / 2); panel(0xff2fd0, 9.8, 2.5, 0, 14, 1.2, Math.PI / 2);
+    panel(0xff7a1a, 0, 1, -9.8, 10, 0.8); panel(0xffffff, 0, 4.9, 0, 6, 6); panel(0x9b5bff, 0, 3, 9.8, 12, 0.6);
+    const top = env.children[env.children.length - 2]; top.rotation.x = Math.PI / 2;
+    const pm = new THREE.PMREMGenerator(this.renderer);
+    setEnvironment(pm.fromScene(env, 0.02).texture);
+    pm.dispose();
+  }
+  presetName() {
+    const q = this.settings.quality;
+    return PRESETS[q] ? q : 'quality';
+  }
+  qualityName() { const p = this.pipeline; return `${p.preset.label}${p.dynamic ? ' DYN' : ''} · ${p.ih || 0}p→${p.oh || 0}p (${Math.round(p.scale * 100)}%) · ${+this.settings.fpsCap === 30 ? 30 : 60} LOCK`; }
+  get quality() { return this.presetName() === 'performance' ? 0 : 1; }
   applyQuality() {
-    if (this.settings.quality !== 'auto') this.qLevel = this.settings.quality;
-    const Q = QUALITY[this.qLevel];
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, Q.pr));
-    if (Q.bloom && !this.composer) {
-      this.composer = new EffectComposer(this.renderer);
-      this.renderPass = new RenderPass(this.menu3d.scene, this.menu3d.camera);
-      this.bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.62, 0.5, 0.58);
-      this.composer.addPass(this.renderPass);
-      this.composer.addPass(this.bloom);
-      this.composer.addPass(new OutputPass());
-    }
-    this.useBloom = Q.bloom;
+    const name = this.presetName(), P = PRESETS[name];
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 3));   // output at true native resolution
+    this.pipeline.setPreset(name, this.settings.dynamicRes !== false);
+    this.renderer.shadowMap.enabled = P.shadows;
+    MIP_BIAS.value = Math.max(-1, Math.log2(P.scale) * 0.9);
     this.resize();
   }
   resize() {
     const w = window.innerWidth, h = window.innerHeight;
     this.renderer.setSize(w, h, false);
     this.canvas.style.width = w + 'px'; this.canvas.style.height = h + 'px';
-    if (this.composer) {
-      this.composer.setPixelRatio(this.renderer.getPixelRatio());
-      this.composer.setSize(w, h);
-      this.bloom.resolution.set(w * this.renderer.getPixelRatio() / 2, h * this.renderer.getPixelRatio() / 2);
-    }
     document.body.classList.toggle('narrow', w / h < 1.35);
   }
   setMode(m) {
@@ -164,8 +168,9 @@ class Game {
   frame(now) {
     requestAnimationFrame(t => this.frame(t));
     const elapsed = now - this.last;
-    // hold a steady 60 fps on 120 Hz panels
-    if (elapsed < 15.2) return;
+    // locked 60 or 30 fps (setting), also on 120 Hz panels
+    const cap = +this.settings.fpsCap === 30 ? 30 : 60, budget = 1000 / cap;
+    if (elapsed < budget - 1.6) return;
     this.last = now;
     const dt = Math.min(elapsed / 1000, 0.1);
     this.fps = this.fps * 0.95 + (1 / dt) * 0.05;
@@ -181,31 +186,18 @@ class Game {
         if (n === 4) this.acc = 0;
         race.render(dt, aspect);
         if (!race.over) this.hud.update(dt, this.fps);
-        const pl = race.player;
-        this.audio.engineUpdate(clamp(Math.abs(pl.speed) / pl.top, 0, 1.4), pl.boostT > 0, race.started && pl.state === 'race');
+        this.audio.updateRace(race, dt);
       }
-      this.draw(race.scene, race.camera);
-      this.adaptQuality(dt);
+      this.draw(race.scene, race.camera, race.dynamicObjects(), race.camMode + (race.lookBack ? 'b' : '') + (race.paused ? 'p' : ''));
+      if (race.started && !race.paused) this.pipeline.adapt(elapsed, budget);
     } else {
       this.input.clearEdges();
       this.menu3d.render(this.renderer, dt, aspect);
-      this.draw(this.menu3d.scene, this.menu3d.camera);
+      this.draw(this.menu3d.scene, this.menu3d.camera, this.menu3d.dynamic(), 'menu');
     }
   }
-  draw(scene, camera) {
-    if (this.useBloom && this.composer) {
-      this.renderPass.scene = scene; this.renderPass.camera = camera;
-      this.composer.render();
-    } else this.renderer.render(scene, camera);
-  }
-  adaptQuality(dt) {
-    if (this.settings.quality !== 'auto' || !this.race || !this.race.started) return;
-    this.fpsAcc.push(dt);
-    if (this.fpsAcc.length >= 180) {
-      const avg = this.fpsAcc.length / this.fpsAcc.reduce((a, b) => a + b, 0);
-      this.fpsAcc.length = 0;
-      if (avg < 52 && this.qLevel !== 'perf') { this.qLevel = this.qLevel === 'high' ? 'balanced' : 'perf'; this.applyQuality(); }
-    }
+  draw(scene, camera, dynamic, cutKey) {
+    this.pipeline.render(scene, camera, dynamic, { cutKey });
   }
 
   // ─── input routing ───────────────────────────────────────────────────────
@@ -223,7 +215,7 @@ class Game {
   }
 
   // ─── flow ────────────────────────────────────────────────────────────────
-  menuMusic() { this.audio.music(100, 45, 3, 0.7); }
+  menuMusic() { this.audio.startMenuMusic(); }
   vehicleLook(cls, ch) {
     const v = this.profile.garage[cls];
     const paint = (PAINTS.find(p => p.id === v.paint) || PAINTS[0]).hex;
@@ -265,7 +257,8 @@ class Game {
     const cup = CUPS[opts.cup];
     this.ui.loadInfo = { cup: cup.name + (opts.mode === 'cup' ? ` · RACE ${opts.track + 1}/4` : opts.mode === 'tt' ? ' · TIME TRIAL' : ''), track: cup.tracks[opts.track].name, color: '#' + cup.pal.a.toString(16).padStart(6, '0'), tip: TIPS[Math.floor(Math.random() * TIPS.length)] };
     this.ui.show('loading', false);
-    this.audio.stopMusic();
+    this.audio.stopMenuMusic(0.6);
+    const musicReady = this.audio.prepareCup(cup);
     setTimeout(() => {
       this.disposeRace();
       try {
@@ -273,26 +266,28 @@ class Game {
       } catch (e) { console.error(e); this.toast('Failed to build track', String(e), '#f55'); this.ui.show('main', false); return; }
       this.hud.setup(this.race);
       this.state = 'race';
-      this.fpsAcc.length = 0;
-      setTimeout(() => {
+      this.pipeline.resetHistory();
+      const go = () => {
+        if (this.race === null || this.ui.screen !== 'loading') return;
         this.ui.hide();
         this.setMode('race');
-        this.audio.engineStart(opts.player.cls);
-        this.audio.music(cup.bpm, cup.root, opts.cup * 7 + opts.track + 1, 1);
+        this.audio.raceStart(this.race);
         this.input.applyLayout();
-      }, 650);
+      };
+      // wait for the cup's score to finish rendering (capped so a slow device never blocks the race)
+      Promise.race([musicReady, new Promise(r => setTimeout(r, 9000))]).then(() => setTimeout(go, 250));
     }, 60);
   }
   disposeRace() {
     if (this.race) { this.race.dispose(); this.race = null; }
-    this.audio.engineStop();
+    this.audio.raceEnd(); this.audio.stopRaceMusic(0.4);
     this.renderer.renderLists.dispose();
   }
 
   pause() {
     if (!this.race || this.race.over) return;
     this.race.paused = true;
-    this.audio.engineUpdate(0, false, false);
+    this.audio.pauseRace(true);
     this.setMode('paused');
     this.ui.show('pause', false);
   }
@@ -300,6 +295,7 @@ class Game {
     if (!this.race) return;
     if (this.ui.screen === 'settings') { this.ui.show('pause', false); return; }
     this.race.paused = false;
+    this.audio.pauseRace(false);
     this.ui.hide();
     this.setMode('race');
     this.last = performance.now();
@@ -339,7 +335,7 @@ class Game {
     res.newAch = this.ach.check(ev);
     saveProfile(p);
     this.lastResult = res;
-    this.audio.engineStop();
+    this.audio.raceEnd();
     setTimeout(() => {
       this.setMode('results');
       this.ui.show('results', false);

@@ -4,7 +4,8 @@ import { mulberry32, clamp, canvasTex, rgba, glowTex, glowMat, wrap, mergeStatic
 const UP = new THREE.Vector3(0, 1, 0);
 export const ROAD_W = 24;
 export const HALF_W = ROAD_W / 2;
-const STEP_TARGET = 2;
+const STEP_TARGET = 1;   // 2x spline/mesh density (was 2 m)
+const SPS = 1 / STEP_TARGET; // samples per metre, for sample-count constants
 
 // ─── centerline generation ──────────────────────────────────────────────────
 function shapePoints(def, hMul, wMul) {
@@ -115,7 +116,7 @@ export class Track {
       raw[i] = d.dot(flatR[i]);
     }
     // smooth curvature
-    const W = 6;
+    const W = Math.round(12 * SPS);
     for (let i = 0; i < n; i++) {
       let s = 0;
       for (let k = -W; k <= W; k++) s += raw[(i + k + n) % n];
@@ -139,14 +140,14 @@ export class Track {
   _badCrossing() {
     const n = this.n, P = this.P, cell = 30;
     const grid = new Map();
-    for (let i = 0; i < n; i += 2) {
+    for (let i = 0; i < n; i += 4 * SPS) {
       const k = Math.floor(P[i].x / cell) + ',' + Math.floor(P[i].z / cell);
       if (!grid.has(k)) grid.set(k, []);
       grid.get(k).push(i);
     }
     this.crossings = [];
     let bad = false;
-    for (let i = 0; i < n; i += 2) {
+    for (let i = 0; i < n; i += 4 * SPS) {
       const cx = Math.floor(P[i].x / cell), cz = Math.floor(P[i].z / cell);
       for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
         const arr = grid.get((cx + dx) + ',' + (cz + dz));
@@ -351,10 +352,10 @@ export class Track {
         g.stroke();
         g.fillStyle = rgba(pal.c, 0.7); g.beginPath(); g.arc(x, y, 4, 0, 6.28); g.fill();
       }
-    }, { repeat: true });
+    }, { repeat: true, scale: 2, aniso: 16 });
     const size = Math.max(this.box.max.x - this.box.min.x, this.box.max.z - this.box.min.z) + 1600;
     tex.repeat.set(size / 120, size / 120);
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(size, size), new THREE.MeshBasicMaterial({ map: tex }));
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(size, size), mipBias(new THREE.MeshBasicMaterial({ map: tex })));
     m.rotation.x = -Math.PI / 2;
     const c = this.box.getCenter(new THREE.Vector3());
     m.position.set(c.x, this.groundY, c.z);
@@ -391,7 +392,7 @@ export class Track {
       // edges
       glowLine(6, pal.a, 4, 1.0); glowLine(w - 6, pal.a, 4, 1.0);
       g.fillStyle = 'rgba(255,255,255,0.9)'; g.fillRect(3, 0, 3, h); g.fillRect(w - 6, 0, 3, h);
-    }, { repeat: true, aniso: 8 });
+    }, { repeat: true, aniso: 16, scale: 2 });
   }
 
   _road() {
@@ -425,7 +426,8 @@ export class Track {
     g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
     g.setIndex(idx);
     this.roadTex = this._roadTexture();
-    const road = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: this.roadTex, side: THREE.DoubleSide }));
+    const road = new THREE.Mesh(g, mipBias(new THREE.MeshBasicMaterial({ map: this.roadTex, side: THREE.DoubleSide })));
+    this.roadGeo = g;
     this.group.add(road);
 
     const ug = new THREE.BufferGeometry();
@@ -470,7 +472,7 @@ export class Track {
           const b0 = e0.clone().addScaledVector(U[i], 1.25), b1 = e1.clone().addScaledVector(U[i1], 1.25);
           top.push(a0.x, a0.y, a0.z, b0.x, b0.y, b0.z, a1.x, a1.y, a1.z, b1.x, b1.y, b1.z);
           tidx.push(tv, tv + 2, tv + 1, tv + 1, tv + 2, tv + 3); tv += 4;
-        } else if (open0 === 1 && open1 === 1 && (i % 3 !== 2)) {
+        } else if (open0 === 1 && open1 === 1 && (Math.floor(i / (2 * SPS)) % 3 !== 2)) {
           const in0 = e0.clone().addScaledVector(R[i], -side * 0.5).addScaledVector(U[i], 0.06), in1 = e1.clone().addScaledVector(R[i1], -side * 0.5).addScaledVector(U[i1], 0.06);
           const o0 = e0.clone().addScaledVector(U[i], 0.06), o1 = e1.clone().addScaledVector(U[i1], 0.06);
           warn.push(in0.x, in0.y, in0.z, o0.x, o0.y, o0.z, in1.x, in1.y, in1.z, o1.x, o1.y, o1.z);
@@ -484,14 +486,14 @@ export class Track {
       const m = new THREE.Mesh(g, mat); this.group.add(m); return m;
     };
     mk(wall, widx, new THREE.MeshBasicMaterial({ color: pal.a, transparent: true, opacity: 0.11, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false }));
-    mk(top, tidx, new THREE.MeshBasicMaterial({ color: new THREE.Color(pal.a).multiplyScalar(0.8), side: THREE.DoubleSide }));
+    mk(top, tidx, new THREE.MeshBasicMaterial({ color: new THREE.Color(pal.a).multiplyScalar(1.5), side: THREE.DoubleSide }));
     this.warnMat = new THREE.MeshBasicMaterial({ color: 0xff3020, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
     if (warn.length) mk(warn, wnidx, this.warnMat);
   }
 
   _pillars() {
     const list = [];
-    for (let i = 0; i < this.n; i += 14) {
+    for (let i = 0; i < this.n; i += Math.round(28 * SPS)) {
       const p = this.P[i];
       const h = p.y - 1.8 - this.groundY;
       if (h > 2) list.push([p, h]);
@@ -500,7 +502,7 @@ export class Track {
     const geo = new THREE.BoxGeometry(2.4, 1, 2.4);
     const mat = new THREE.MeshBasicMaterial({ color: 0x0b0e1a });
     const im = new THREE.InstancedMesh(geo, mat, list.length);
-    const ring = new THREE.InstancedMesh(new THREE.BoxGeometry(2.6, 0.35, 2.6), new THREE.MeshBasicMaterial({ color: this.pal.b }), list.length * 2);
+    const ring = new THREE.InstancedMesh(new THREE.BoxGeometry(2.6, 0.35, 2.6), new THREE.MeshBasicMaterial({ color: new THREE.Color(this.pal.b).multiplyScalar(1.6) }), list.length * 2);
     const m = new THREE.Matrix4();
     list.forEach(([p, h], k) => {
       m.makeScale(1, h, 1).setPosition(p.x, this.groundY + h / 2, p.z); im.setMatrixAt(k, m);
@@ -512,7 +514,7 @@ export class Track {
 
   _gates() {
     const pal = this.pal;
-    const archMat = new THREE.MeshBasicMaterial({ color: pal.a });
+    const archMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(pal.a).multiplyScalar(1.8) });
     const darkMat = new THREE.MeshBasicMaterial({ color: 0x0a0c18 });
     const mkArch = (s, banner) => {
       const g = new THREE.Group();
@@ -548,7 +550,7 @@ export class Track {
     const pal = this.pal, r = mulberry32(this.def.seed * 3 + 1);
     // occupancy hash of track footprint
     const cell = 20, occ = new Set();
-    for (let i = 0; i < this.n; i += 2) {
+    for (let i = 0; i < this.n; i += Math.round(4 * SPS)) {
       const p = this.P[i];
       for (let dx = -3; dx <= 3; dx++) for (let dz = -3; dz <= 3; dz++) occ.add((Math.floor(p.x / cell) + dx) + ',' + (Math.floor(p.z / cell) + dz));
     }
@@ -559,7 +561,7 @@ export class Track {
         if (v < 0.45) { g.fillStyle = v < 0.12 ? rgba(pal.c, 0.9) : v < 0.3 ? rgba(pal.a, 0.75) : 'rgba(200,220,255,0.35)'; g.fillRect(x, y, 6, 5); }
       }
       g.fillStyle = rgba(pal.a, 0.9); g.fillRect(0, 0, w, 3);
-    });
+    }, { scale: 2, aniso: 16 });
     const count = quality > 0 ? 260 : 150;
     const bgeo = new THREE.BoxGeometry(1, 1, 1);
     bgeo.translate(0, 0.5, 0);
@@ -627,7 +629,7 @@ export class Track {
     const pal = this.pal;
     // ramps
     for (const j of this.jumps) {
-      const steps = 10, pos = [], ind = [];
+      const steps = 20, pos = [], ind = [];
       for (let k = 0; k <= steps; k++) {
         const s = j.s0 + (k / steps) * j.ramp;
         const f = this.frame(s, { pos: new THREE.Vector3(), t: new THREE.Vector3(), r: new THREE.Vector3(), u: new THREE.Vector3() });
@@ -651,7 +653,7 @@ export class Track {
         c.fillStyle = '#120a1a'; c.fillRect(0, 0, w, h);
         for (let y = 0; y < h; y += 32) { c.strokeStyle = rgba(j.mega ? pal.c : pal.a, 0.95); c.lineWidth = 6; c.beginPath(); c.moveTo(6, y + 24); c.lineTo(w / 2, y + 6); c.lineTo(w - 6, y + 24); c.stroke(); }
       }, { repeat: true });
-      const uv = []; for (let k = 0; k <= steps; k++) uv.push(0, k / 2, 0, k / 2, 1, k / 2, 1, k / 2);
+      const uv = []; for (let k = 0; k <= steps; k++) uv.push(0, k / 4, 0, k / 4, 1, k / 4, 1, k / 4);
       g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
       this.group.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide })));
     }
@@ -680,7 +682,7 @@ export class Track {
       new THREE.MeshBasicMaterial({ color: pal.a, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }), nC);
     const rg = mergeRings();
     const rings = new THREE.InstancedMesh(rg, new THREE.MeshBasicMaterial({ color: pal.a }), nC);
-    const core = new THREE.InstancedMesh(new THREE.OctahedronGeometry(0.55, 0), new THREE.MeshBasicMaterial({ color: pal.c }), nC);
+    const core = new THREE.InstancedMesh(new THREE.OctahedronGeometry(0.55, 1), new THREE.MeshBasicMaterial({ color: new THREE.Color(pal.c).multiplyScalar(2.2) }), nC);
     const gpos = new Float32Array(nC * 3);
     const tmp = new THREE.Object3D();
     this.capsules.forEach((c, k) => {
@@ -814,7 +816,7 @@ export class Track {
   minimapPath() {
     const pts = [];
     const b = this.box, w = b.max.x - b.min.x, d = b.max.z - b.min.z, sc = 1 / Math.max(w, d);
-    for (let i = 0; i < this.n; i += 4) pts.push([(this.P[i].x - b.min.x) * sc, (this.P[i].z - b.min.z) * sc, this.P[i].y]);
+    for (let i = 0; i < this.n; i += Math.round(8 * SPS)) pts.push([(this.P[i].x - b.min.x) * sc, (this.P[i].z - b.min.z) * sc, this.P[i].y]);
     return { pts, sc, minx: b.min.x, minz: b.min.z, w: w * sc, d: d * sc };
   }
 
@@ -837,6 +839,16 @@ function mergeRings() {
   const idx = [...ia, ...Array.from(b.index.array, v => v + n)];
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setIndex(idx);
   return g;
+}
+
+// Sample the base map with a negative LOD bias matched to the upscaler's render scale
+export const MIP_BIAS = { value: -0.55 };
+function mipBias(mat) {
+  mat.onBeforeCompile = sh => {
+    sh.uniforms.mipBias = MIP_BIAS;
+    sh.fragmentShader = 'uniform float mipBias;\n' + sh.fragmentShader.replace('#include <map_fragment>', '#ifdef USE_MAP\n diffuseColor *= texture2D( map, vMapUv, mipBias );\n#endif');
+  };
+  return mat;
 }
 
 export function makeTrapMesh(c1, c2) {

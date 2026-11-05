@@ -19,7 +19,7 @@ export function defaultProfile() {
   };
 }
 export function defaultSettings() {
-  return { steerMode: 'stick', autoAccel: false, leftHanded: false, buttonScale: 1, buttonOpacity: 0.55, assist: true, camera: 'chase', quality: 'auto', musicVol: 0.5, sfxVol: 0.8, haptics: true, showFps: false };
+  return { steerMode: 'stick', autoAccel: false, leftHanded: false, buttonScale: 1, buttonOpacity: 0.55, assist: true, camera: 'chase', quality: 'quality', dynamicRes: true, fpsCap: 60, musicVol: 0.5, sfxVol: 0.8, haptics: true, showFps: false };
 }
 
 export function loadProfile() {
@@ -34,7 +34,7 @@ export function loadProfile() {
 }
 export function saveProfile(p) { try { localStorage.setItem(KEY, JSON.stringify(p)); } catch (_) {} }
 export function loadSettings() {
-  try { const s = JSON.parse(localStorage.getItem(SKEY)); if (s) return { ...defaultSettings(), ...s }; } catch (_) {}
+  try { const s = JSON.parse(localStorage.getItem(SKEY)); if (s) { const m = { auto: 'quality', high: 'quality', perf: 'performance' }; if (m[s.quality]) s.quality = m[s.quality]; return { ...defaultSettings(), ...s }; } } catch (_) {}
   return defaultSettings();
 }
 export function saveSettings(s) { try { localStorage.setItem(SKEY, JSON.stringify(s)); } catch (_) {} }

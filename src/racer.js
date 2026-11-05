@@ -5,6 +5,14 @@ import { clamp, damp, wrap } from './util.js';
 import { buildVehicle, buildShield, Trail } from './models.js';
 
 export const GRAV = 26;
+let _blob;
+function blobTex() {
+  if (_blob) return _blob;
+  const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+  const gr = g.createRadialGradient(64, 64, 6, 64, 64, 62); gr.addColorStop(0, 'rgba(0,0,0,0.95)'); gr.addColorStop(0.55, 'rgba(0,0,0,0.55)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+  _blob = new THREE.CanvasTexture(c); return _blob;
+}
 const DRIFT_LV = [0.85, 1.75, 2.7];
 const DRIFT_BOOST = [0, 0.5, 0.9, 1.35];
 export const DRIFT_COLORS = [0xffffff, 0x3fd8ff, 0xc060ff, 0xff8a1a];
@@ -61,6 +69,10 @@ export class Racer {
     this.model = v; this.root = v.root; this.neonColor = new THREE.Color(neon);
     race.scene.add(this.root);
     this.shieldMesh = buildShield(0x4dfff3); this.shieldMesh.visible = false; this.root.add(this.shieldMesh);
+    if (!race.game.renderer.shadowMap.enabled) {
+      this.blob = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 4.4).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: blobTex(), transparent: true, depthWrite: false, opacity: 0.6, polygonOffset: true, polygonOffsetFactor: -2 }));
+      this.blob.renderOrder = -1; this.root.add(this.blob);
+    }
     this.trails = v.tail.map(() => new Trail(race.scene, neon, this.isPlayer ? 26 : 18, o.cls === 'bike' ? 0.32 : 0.26, o.trail || 'std'));
     this.worldPos = new THREE.Vector3(); this.worldUp = new THREE.Vector3(0, 1, 0); this.worldFwd = new THREE.Vector3(0, 0, 1);
   }
@@ -407,6 +419,8 @@ export class Racer {
     this.root.visible = this.state !== 'fall' || this.fallT > 0.35;
     if (this.invulnT > 0) body.visible = Math.floor(race.time * 14) % 2 === 0; else body.visible = true;
 
+    // contact shadow: tight and dark on the ground, wider/fainter in the air (contact hardening)
+    if (this.blob) { const hh = Math.max(0, this.h); this.blob.position.y = -hh + 0.04; const k = 1 + hh * 0.12; this.blob.scale.set(k, 1, k); this.blob.material.opacity = 0.62 / (1 + hh * 0.35); this.blob.visible = this.state !== 'fall'; }
     // shield
     const sh = this.shield || this.orbital;
     this.shieldMesh.visible = !!this.shield || this.phaseT > 0;
