@@ -19,7 +19,7 @@ export function defaultProfile() {
   };
 }
 export function defaultSettings() {
-  return { steerMode: 'stick', autoAccel: false, leftHanded: false, buttonScale: 1, buttonOpacity: 0.55, assist: true, camera: 'chase', quality: 'quality', dynamicRes: true, fpsCap: 60, musicVol: 0.5, sfxVol: 0.8, haptics: true, showFps: false };
+  return { steerMode: 'stick', autoAccel: false, leftHanded: false, buttonScale: 1, buttonOpacity: 0.55, assist: true, camera: 'chase', camZoom: 'standard', quality: 'quality', dynamicRes: true, fpsCap: 60, musicVol: 0.5, sfxVol: 0.8, haptics: true, showFps: false };
 }
 
 export function loadProfile() {

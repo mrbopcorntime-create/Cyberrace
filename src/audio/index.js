@@ -5,6 +5,10 @@ import workerSrc from './worker.gen.txt';
 import { LOOP_SEC, RACE_BPM, FINAL_BPM, GROOVE_BPM, kickTimes, renderTier, renderMenu, renderStinger } from './music.js';
 import { renderBank } from './sfxbank.js';
 import { LAPS } from '../data.js';
+import { NativeMusic } from './native.js';
+
+// UI screen -> menu-song state (native adaptive music)
+const MENU_STATE = { title: 'main', main: 'main', quit: 'main', select: 'select', cups: 'select', tracks: 'select', garage: 'lounge', ach: 'lounge', guide: 'lounge', settings: 'lounge', confirmreset: 'lounge', loading: 'loading', results: 'results', standings: 'results', trophy: 'results' };
 
 const dbToGain = db => Math.pow(10, db / 20);
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
@@ -190,6 +194,10 @@ export class Audio {
     this.listener = { pos: new THREE.Vector3(), prev: new THREE.Vector3(), vel: new THREE.Vector3(), right: new THREE.Vector3(1, 0, 0), fwd: new THREE.Vector3(0, 0, -1) };
     this.aiVoices = []; this.projVoices = new Map();
     this.threatT = 0; this.locked = false;
+    // native adaptive stem music (APK); null in a desktop browser -> WebAudio synth score
+    this.nm = NativeMusic.detect();
+    this.menuIntroPlayed = false; this._stingerUntil = 0;
+    if (this.nm) this.applyVolumes();
   }
 
   // ─── setup ────────────────────────────────────────────────────────────────
@@ -202,7 +210,7 @@ export class Audio {
     this._graph();
     this._workers();
     this.loadBank();
-    this.loadMenu().then(() => { if (this.wantMenu) this.startMenuMusic(); });
+    if (!this.nm) this.loadMenu().then(() => { if (this.wantMenu) this.startMenuMusic(); });
   }
 
   _graph() {
@@ -257,8 +265,9 @@ export class Audio {
   }
 
   applyVolumes() {
-    if (!this.ctx) return;
     const s = this.game.settings, sfx = s.sfxVol ?? 0.8, mus = s.musicVol ?? 0.5;
+    if (this.nm) this.nm.setVolume(dbToGain(-8) * mus * 2);
+    if (!this.ctx) return;
     this.bus.music.gain.value = dbToGain(-8) * mus * 2;
     this.bus.sfx.gain.value = sfx;
     this.bus.ui.gain.value = sfx;
@@ -315,11 +324,25 @@ export class Audio {
     const c = { id: cup.id, root: cup.root };
     const t0 = performance.now();
     const entry = { id: cup.id, tiers: [], win: null, lose: null };
-    entry.p = Promise.all([0, 1, 2].map(i => this._job({ job: 'tier' + i, sr: this.sr, cup: c }).then(d => { entry.tiers[i] = this._toBuffer(d); })))
+    entry.p = (this.nm ? Promise.resolve() : Promise.all([0, 1, 2].map(i => this._job({ job: 'tier' + i, sr: this.sr, cup: c }).then(d => { entry.tiers[i] = this._toBuffer(d); }))))
       .then(() => Promise.all(['win', 'lose'].map(j => this._job({ job: j, sr: this.sr, cup: c }).then(d => { entry[j] = this._toBuffer(d); }))))
       .then(() => { entry.ms = performance.now() - t0; });
     this.cupStems = entry;
     return entry.p;
+  }
+
+  // Native: decode the track's stems ahead of the race (resolves when ready, false on timeout/no song)
+  prepareTrack(cupIdx, trackIdx) {
+    if (!this.nm) return Promise.resolve(true);
+    return this.nm.ready(NativeMusic.trackId(cupIdx, trackIdx));
+  }
+  // Menu music follows the UI screen (native only; WebAudio keeps one menu loop)
+  menuScreen(name) {
+    if (!this.nm) return;
+    if (this.race && this.race.native) return;             // race music owns the bus (pause/settings in race)
+    const st = MENU_STATE[name]; if (!st) return;
+    if (st === 'loading') { if (this.nm.current === 'menu') this.nm.setState('loading', 1); return; }
+    this.startMenuMusic(st);
   }
 
   // ─── one-shots ────────────────────────────────────────────────────────────
@@ -356,6 +379,7 @@ export class Audio {
     p.setTargetAtTime(1, t + 0.010 + hold, 0.25 / 4.6);                          // ~250 ms release
   }
   duck(kind, hold = 0.05) {
+    if (this.nm) { const db = kind === 'high' ? -5.5 : kind === 'lock' ? -4 : kind === 'surge' ? -2 : 0; if (db) this.nm.duck(db, kind === 'surge' ? hold * 0.5 : hold); }
     if (!this.ctx) return;
     if (kind === 'high') { this._duckParam(this.musicDuck.gain, -5.5, hold); this._duckParam(this.engDuck.gain, -5, hold); }
     else if (kind === 'lock') { this._duckParam(this.musicDuck.gain, -4, hold); this._duckParam(this.engDuck.gain, -4, hold); }
@@ -363,6 +387,7 @@ export class Audio {
   }
   // EMP: low-pass choke across the victim's whole world bus for 1.5 s
   victimEmp(dur = 1.5) {
+    if (this.nm) this.nm.lowpassPulse(480, dur);
     if (!this.ctx) return;
     const f = this.choke.frequency, t = this.ctx.currentTime;
     f.cancelScheduledValues(t); f.setValueAtTime(f.value, t);
@@ -376,8 +401,17 @@ export class Audio {
   combat() { if (this.ctx) this.state.combatT = this.ctx.currentTime; }
 
   // ─── interactive music ───────────────────────────────────────────────────
-  startMenuMusic() {
+  startMenuMusic(state = 'main') {
     this.wantMenu = true;
+    if (this.nm) {
+      const wait = this.ctx ? (this._stingerUntil - this.ctx.currentTime) : 0;   // let the win/lose stinger finish
+      if (wait > 0.05) { clearTimeout(this._menuT); this._menuT = setTimeout(() => this.startMenuMusic(state), wait * 1000); return; }
+      if (this._kickTimer) clearInterval(this._kickTimer); this._kickTimer = null; this.race = null;
+      if (this.nm.current === 'menu') this.nm.setState(state, 4);
+      else this.nm.play('menu', state, { fade: 1.2, intro: !this.menuIntroPlayed });
+      this.menuIntroPlayed = true;
+      return;
+    }
     if (!this.ctx || !this.stems.menu || this.menuSrc) return;
     this.stopRaceMusic(0.3);
     const c = this.ctx, s = c.createBufferSource(), g = c.createGain();
@@ -388,11 +422,26 @@ export class Audio {
   }
   stopMenuMusic(fade = 0.4) {
     this.wantMenu = false;
+    if (this.nm) { clearTimeout(this._menuT); if (this.nm.current === 'menu') this.nm.setState('loading', 1); return; }
     if (!this.menuSrc) return;
     const { s, g } = this.menuSrc; this.menuSrc = null;
     g.gain.setTargetAtTime(0, this.ctx.currentTime, fade / 4); setTimeout(() => { try { s.stop(); } catch (_) {} }, fade * 1500);
   }
   startRaceMusic() {
+    if (this.nm) {
+      const race = this.game.race; if (!race) return false;
+      const id = NativeMusic.trackId(race.opts.cup, race.opts.track);
+      if (!this.nm.has(id)) return false;
+      clearTimeout(this._menuT);
+      // bar 1 of the song lands exactly on "GO"; pads + filtered bass play over the countdown
+      this.nm.play(id, 'grid', { fade: 1.5, dropIn: Math.max(0.05, -race.time) });
+      this.race = { native: true, id, song: this.nm.song(id), kick: this.nm.kickBeats(id), lastBeat: -1, tier: 'grid' };
+      this.state = { tier: 0, combatT: -99, holdUntil: 0, final: false, speedHold: 0 };
+      this._lastKick = -1e9;
+      if (this._kickTimer) clearInterval(this._kickTimer);
+      this._kickTimer = setInterval(() => this._scheduleKicks(), 40);
+      return true;
+    }
     if (!this.ctx || !this.cupStems || !this.cupStems.tiers[2]) return false;
     this.stopMenuMusic(0.3); this.stopRaceMusic(0);
     const c = this.ctx, t0 = c.currentTime + 0.08;
@@ -411,6 +460,7 @@ export class Audio {
   stopRaceMusic(fade = 0.5) {
     if (this._kickTimer) clearInterval(this._kickTimer); this._kickTimer = null;
     if (!this.race) return;
+    if (this.race.native) { this.race = null; if (this.nm.current !== 'menu') this.nm.stop(fade); return; }
     const t = this.ctx.currentTime;
     for (const x of this.race.srcs) { x.g.gain.cancelScheduledValues(t); x.g.gain.setTargetAtTime(0, t, Math.max(0.01, fade / 4)); const s = x.s; setTimeout(() => { try { s.stop(); } catch (_) {} }, fade * 1500 + 50); }
     this.race = null;
@@ -438,6 +488,10 @@ export class Audio {
   }
   _finalLapRamp() {
     const R = this.race; if (!R) return;
+    if (R.native) {   // everything in, +4 BPM varispeed over two bars
+      this.nm.setState('final', 1); this.nm.setRate(R.song.finalRate || 1.023, 8);
+      this.play('final_lap'); return;
+    }
     const c = this.ctx, now = c.currentTime, newRate = FINAL_BPM / RACE_BPM, ramp = 0.25;
     this._setTier(2, true);
     R.musBase = this.musTime(now); R.tBase = now; R.rate = newRate; // (ramp error < 2 ms)
@@ -447,6 +501,19 @@ export class Audio {
   // Kick → sub-bass sidechain on the engine bus, locked to the music clock
   _scheduleKicks() {
     const R = this.race; if (!R) return;
+    if (R.native) {   // engine sub-band sidechain locked to the native music clock
+      const c = this.ctx; if (!c || !this.engSub) return;
+      const b = this.nm.beat(), bpm = this.nm.bpm(), ahead = 0.16 * bpm / 60, p = this.engSub.gain;
+      const { beats, span } = R.kick;
+      for (let base = Math.floor(b / span) * span; base < b + ahead; base += span) for (const k of beats) {
+        const kb = base + k;
+        if (kb <= this._lastKick || kb < b || kb >= b + ahead) continue;
+        this._lastKick = kb;
+        const tk = c.currentTime + (kb - b) * 60 / bpm;
+        p.setTargetAtTime(0.3, tk, 0.003); p.setTargetAtTime(1, tk + 0.03, 0.05);
+      }
+      return;
+    }
     const c = this.ctx, now = c.currentTime, ahead = 0.16;
     const m0 = this.musTime(now), m1 = this.musTime(now + ahead);
     const kt = kickTimes(R.tier === 0 ? 0 : 1);
@@ -467,6 +534,7 @@ export class Audio {
     this.stopRaceMusic(0.25);
     const buf = this.cupStems && this.cupStems[win ? 'win' : 'lose'];
     if (!buf) return this.play('finish');
+    this._stingerUntil = this.ctx.currentTime + buf.duration * 0.8;
     const s = this.ctx.createBufferSource(); s.buffer = buf; s.connect(this.bus.music); s.start(this.ctx.currentTime + 0.05);
   }
   countdown(n) { this.play(n === 0 ? 'cd_go' : 'cd_' + n); if (n === 0) this.duck('high', 0.1); }
@@ -484,7 +552,7 @@ export class Audio {
     const tr = race.track, f = { pos: new THREE.Vector3(), t: new THREE.Vector3(), r: new THREE.Vector3(), u: new THREE.Vector3() };
     for (const h of tr.hazards) { tr.frame(h.s, f); this.ambEmitters.push({ pos: f.pos.clone(), h }); }
     for (let s = 0; s < tr.L; s += 190) { tr.frame(s, f); this.ambEmitters.push({ pos: f.pos.clone().add(new THREE.Vector3(0, 10, 0)), h: null }); }
-    if (!this.startRaceMusic()) { this.prepareCup(race.cup).then(() => { if (this.game.race === race) this.startRaceMusic(); }); }
+    if (!this.startRaceMusic() && !this.nm) { this.prepareCup(race.cup).then(() => { if (this.game.race === race) this.startRaceMusic(); }); }
     this.listener.prev.copy(race.camera.position);
   }
   raceEnd() {
@@ -495,6 +563,7 @@ export class Audio {
     this.projVoices.clear();
   }
   pauseRace(on) {
+    if (this.nm) this.nm.setPaused(on);
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
     this.engDuck.gain.cancelScheduledValues(t); this.engDuck.gain.setTargetAtTime(on ? 0 : 1, t, 0.05);
@@ -574,7 +643,7 @@ export class Audio {
     // rhythmic circuit pulses on the beat
     if (this.race) {
       const beat = 60 / (this.race.tier === 0 ? GROOVE_BPM : RACE_BPM);
-      const b = Math.floor(this.musTime(t) / beat);
+      const b = this.race.native ? Math.floor(this.nm.beat()) : Math.floor(this.musTime(t) / beat);
       if (b !== this.race.lastBeat) {
         this.race.lastBeat = b;
         let best = null, bd = 85;
@@ -587,12 +656,27 @@ export class Audio {
     if (!this.race) return;
     const t = this.ctx.currentTime, pl = race.player, S = this.state;
     if (pl.finished) return;
+    if (this.race.native) return this._nativeState(race, t, pl, S);
     if (race.started && pl.lap >= LAPS - 1) { if (!S.final) { S.final = true; this._finalLapRamp(); } return; }
     let near = 0;
     for (const r of race.racers) if (r !== pl && r.state === 'race' && r.worldPos.distanceTo(pl.worldPos) < 15) near++;
     const hot = race.started && (near >= 2 || t - S.combatT < 3);
     if (hot) S.holdUntil = t + 4;
     this._setTier(race.started && t < S.holdUntil ? 1 : 0);
+  }
+  // grid → cruise → race → intense → final. Layers enter on the next beat (combat) or bar (speed).
+  _nativeState(race, t, pl, S) {
+    if (!race.started) return this.nm.setState('grid', 1);
+    if (pl.lap >= LAPS - 1) { if (!S.final) { S.final = true; this._finalLapRamp(); } return; }
+    let near = 0;
+    for (const r of race.racers) if (r !== pl && r.state === 'race' && r.worldPos.distanceTo(pl.worldPos) < 15) near++;
+    if (near >= 2 || t - S.combatT < 3 || pl.boostT > 0.4) S.holdUntil = Math.max(S.holdUntil, t + 4);
+    const spd = Math.abs(pl.speed) / pl.top;
+    if (spd > 0.55) S.speedHold = t + 2.5;                 // stay in "race" through short slow-downs
+    const want = t < S.holdUntil ? 'intense' : (spd > 0.55 || t < S.speedHold) ? 'race' : 'cruise';
+    const q = want === 'intense' ? 1 : this.nm.state === 'grid' ? 1 : 4;
+    this.nm.setState(want, q);
+    this.race.tier = want === 'cruise' ? 0 : 1;
   }
   _startProj(p) {
     const c = this.ctx;

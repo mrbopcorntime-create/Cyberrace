@@ -1,0 +1,17 @@
+X:1
+T:Qubit Spiral
+C:Cyber Race OST (quantum glitch)
+N:Key Bdor (dorian); written in K:C with explicit accidentals
+M:4/4
+L:1/16
+Q:1/4=172
+K:C
+%%MIDI program 81
+"E"e3^c3A3B3^G4 | ^G3^G3^G10 | "F#m"^G3^G3^G3A3^G4 | ^G3^G3^G10 |
+"Bm"^G3^G3^G3A3^G4 | ^G3^G3^G10 | "Bm"A6^c2B6^c2 | A3B3B4B6 |
+"E"e3^c3A3B3^G4 | ^G3^G3^G10 | "F#m"^G3^G3^G3A3^G4 | ^G3^G3^G10 |
+"Bm"^g3^g3^g3a3^g4 | ^g3^g3^g10 | "Bm"a6^c'2b6^c'2 | a3b3b4b6 |
+"Abm"^f8d6^f2 | ^g12^g4 | "A"e8^c6e2 | e12e4 |
+"Bm"B8B6d2 | d12d4 | "Bm"B6B6B4 | B8B8 |
+"Abm"^f8d6^f2 | ^g12^g4 | "A"e8^c6e2 | e12e4 |
+"Bm"B8B6d2 | d12d4 | "Bm"B6B6B4 | B8B8 |

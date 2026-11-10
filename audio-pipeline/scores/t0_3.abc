@@ -1,0 +1,17 @@
+X:1
+T:Overclock Oval
+C:Cyber Race OST (neon roller)
+N:Key Cm (harmonic); written in K:C with explicit accidentals
+M:4/4
+L:1/16
+Q:1/4=176
+K:C
+%%MIDI program 81
+"Cm"g3b3c'2c'4b2c'2 | b6z2g2f2^d4 | "Ab"^d3g3^g2^g4=g2^g2 | g6z2^d2=d2c4 |
+"Fm"c3^d3f2f4^d2f2 | ^d6z2c2B2^G4 | "G"z2B2^G2B4c2^G4 | z2B2c2B4^G2g4 |
+"Cm"g3b3c'2c'4b2c'2 | b6z2g2f2^d4 | "Ab"^d3g3^g2^g4=g2^g2 | g6z2^d2=d2c4 |
+"Fm"c'3^d'3f'2f'4^d'2f'2 | ^d'6z2c'2b2^g4 | "G"z2b2^g2b4c'2^g4 | z2b2c'2b4^g2g'4 |
+"Cm"c'8c'6d'2 | c'12b4 | "G"d'8d'6^d'2 | d'12b4 |
+"Ab"c'8c'6d'2 | c'12^g4 | "Fm"^g6f6^d4 | f8f8 |
+"Cm"c'8c'6d'2 | c'12b4 | "G"d'8d'6^d'2 | d'12b4 |
+"Ab"c'8c'6d'2 | c'12^g4 | "Fm"^g6f6^d4 | f8f8 |

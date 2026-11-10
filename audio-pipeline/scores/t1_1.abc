@@ -1,0 +1,17 @@
+X:1
+T:Firewall Gauntlet
+C:Cyber Race OST (jump-up rock)
+N:Key Cm (aeolian); written in K:C with explicit accidentals
+M:4/4
+L:1/16
+Q:1/4=176
+K:C
+%%MIDI program 81
+"Cm"g3f3g3f3^d4 | c3^A3^G10 | "Ab"^G3^G3^A3^G3^G4 | ^G3^G3^G10 |
+"Eb"^A3^G3^A3^G3^G4 | ^G3^G3^G10 | "Bb"^A6c2^A6d2 | ^A3^G3^A4^a6 |
+"Cm"g3f3g3f3^d4 | c3^A3^G10 | "Ab"^G3^G3^A3^G3^G4 | ^G3^G3^G10 |
+"Eb"^a3^g3^a3^g3^g4 | ^g3^g3^g10 | "Bb"^a6c'2^a6d'2 | ^a3^g3^a4^a'6 |
+"Cm"c'8^a6^g2 | ^d12c4 | "Bb"d8c6c2 | c12c4 |
+"Ab"c8c6c2 | c12c4 | "Bb"d6d6c4 | c8^a8 |
+"Cm"c'8^a6^g2 | ^d12c4 | "Bb"d8c6c2 | c12c4 |
+"Ab"c8c6c2 | c12c4 | "Bb"d6d6c4 | c8^a8 |

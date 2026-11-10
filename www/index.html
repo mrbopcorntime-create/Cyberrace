@@ -145,6 +145,10 @@ body[data-mode=results] #ui.on,body[data-mode=paused] #ui.on{background:rgba(3,4
 .dialog{margin:auto;padding:4vmin;background:var(--panel);border:1px solid var(--line);min-width:50vmin;text-align:center}
 .dialog h2{margin:0 0 1vmin;font-style:italic}.dialog .menu{margin-top:2vmin}.dialog .row{margin-top:2vmin}
 .dialog.pause .menu button{text-align:center}
+.dialog.pause .zoomrow{display:flex;flex-direction:column;align-items:center;gap:1.4vmin;margin:1vmin 0 .6vmin}
+.dialog.pause .zoomrow>span{font-size:1.9vmin;font-weight:700;letter-spacing:.12em;opacity:.75}
+.dialog.pause .zoomrow>div{display:flex;gap:.8vmin;flex-wrap:wrap;justify-content:center}
+.dialog.pause .zoomrow .tab{font-size:2vmin;padding:1vmin 1.6vmin;text-align:center}
 .tabs{display:flex;gap:.8vmin;flex-wrap:wrap}
 .tab{padding:1vmin 2vmin;border:1px solid var(--line);background:rgba(8,12,30,.7);font-size:2.2vmin;font-weight:700;transform:skewX(-8deg)}
 .tab small{display:block;font-size:1.5vmin;font-weight:400;opacity:.7}

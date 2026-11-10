@@ -1,0 +1,17 @@
+X:1
+T:Superposition Split
+C:Cyber Race OST (quantum glitch)
+N:Key Em (harmonic); written in K:C with explicit accidentals
+M:4/4
+L:1/16
+Q:1/4=172
+K:C
+%%MIDI program 81
+"Em"b3g3^f2e4g2^f2 | ^d6z2c2c2c4 | "B"^d3c3c2c4e2^d2 | c6z2c2c2c4 |
+"C"c3c3c2c4e2^d2 | c6z2c2c2c4 | "Am"z2c2c2c4^d2c4 | z2c2^d2e4^d2a4 |
+"Em"b3g3^f2e4g2^f2 | ^d6z2c2c2c4 | "B"^d3c3c2c4e2^d2 | c6z2c2c2c4 |
+"C"c'3c'3c'2c'4e'2^d'2 | c'6z2c'2c'2c'4 | "Am"z2c'2c'2c'4^d'2c'4 | z2c'2^d'2e'4^d'2a'4 |
+"Em"b8^d'6e'2 | ^d'12e'4 | "C"c'8e'6^f'2 | e'12e'4 |
+"Am"c'8e'6^f'2 | e'12e'4 | "B"^f'6^f'6^d'4 | b8b8 |
+"Em"b8^d'6e'2 | ^d'12e'4 | "C"c'8e'6^f'2 | e'12e'4 |
+"Am"c'8e'6^f'2 | e'12e'4 | "B"^f'6^f'6^d'4 | b8b8 |

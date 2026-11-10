@@ -21,6 +21,8 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
+import com.neoncyberrush.game.audio.AdaptiveAudioManager;
+
 /**
  * Neon Cyber Rush host activity.
  * Runs the WebGL game from assets in a fullscreen hardware-accelerated WebView,
@@ -29,6 +31,7 @@ import android.webkit.WebViewClient;
  */
 public class MainActivity extends Activity {
     private WebView web;
+    private AdaptiveAudioManager music;
     private boolean pageReady = false;
     private final float[] lastAxes = new float[10];
 
@@ -74,7 +77,9 @@ public class MainActivity extends Activity {
         s.setLoadWithOverviewMode(true);
         s.setCacheMode(WebSettings.LOAD_NO_CACHE);
 
+        music = new AdaptiveAudioManager(this);
         web.addJavascriptInterface(new Bridge(), "NCRNative");
+        web.addJavascriptInterface(new MusicBridge(), "CRAudio");
         web.setWebChromeClient(new WebChromeClient());
         web.setWebViewClient(new WebViewClient() {
             @Override
@@ -120,6 +125,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onPause() {
         js("window.NCR_onAppPause&&NCR_onAppPause()");
+        if (music != null) music.onHostPause();
         if (web != null) web.onPause();
         super.onPause();
     }
@@ -128,12 +134,17 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         if (web != null) web.onResume();
+        if (music != null) music.onHostResume();
         hideSystemUi();
         js("window.NCR_onAppResume&&NCR_onAppResume()");
     }
 
     @Override
     protected void onDestroy() {
+        if (music != null) {
+            music.release();
+            music = null;
+        }
         if (web != null) {
             web.destroy();
             web = null;
@@ -231,5 +242,29 @@ public class MainActivity extends Activity {
         public String platform() {
             return Build.MANUFACTURER + " " + Build.MODEL + " / Android " + Build.VERSION.RELEASE;
         }
+    }
+
+    /**
+     * Adaptive music, callable from JavaScript as window.CRAudio.*  (see src/audio/native.js).
+     * States per song come from assets/music/manifest.json; quantum is in beats (0 = now, 1 = beat, 4 = bar).
+     */
+    public class MusicBridge {
+        @JavascriptInterface public boolean available() { return music != null && music.available(); }
+        @JavascriptInterface public String manifest() { return music == null ? "{}" : music.manifestJson(); }
+        @JavascriptInterface public void preload(String id) { if (music != null) music.preload(id); }
+        @JavascriptInterface public boolean isReady(String id) { return music != null && music.isReady(id); }
+        @JavascriptInterface public void play(String id, String state, float fadeSec, boolean intro, double startOffsetSec) {
+            if (music != null) music.play(id, state, fadeSec, intro, startOffsetSec);
+        }
+        @JavascriptInterface public void setState(String state, int quantumBeats) { if (music != null) music.setState(state, quantumBeats); }
+        @JavascriptInterface public void setRate(double rate, double rampBeats) { if (music != null) music.setRate(rate, rampBeats); }
+        @JavascriptInterface public void stop(float fadeSec) { if (music != null) music.stop(fadeSec); }
+        @JavascriptInterface public void setVolume(float v) { if (music != null) music.setVolume(v); }
+        @JavascriptInterface public void setPaused(boolean on) { if (music != null) music.setPaused(on); }
+        @JavascriptInterface public void duck(float db, float holdSec) { if (music != null) music.duck(db, holdSec); }
+        @JavascriptInterface public void lowpassPulse(float hz, float holdSec) { if (music != null) music.lowpassPulse(hz, holdSec); }
+        @JavascriptInterface public double beat() { return music == null ? 0 : music.beat(); }
+        @JavascriptInterface public double bpm() { return music == null ? 120 : music.bpm(); }
+        @JavascriptInterface public String status() { return music == null ? "{}" : music.status(); }
     }
 }

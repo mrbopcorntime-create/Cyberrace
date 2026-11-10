@@ -1,0 +1,17 @@
+X:1
+T:Botnet Bridges
+C:Cyber Race OST (darknet neurofunk)
+N:Key Ebm (aeolian); written in K:C with explicit accidentals
+M:4/4
+L:1/16
+Q:1/4=176
+K:C
+%%MIDI program 81
+"Abm"b2^d'2^d'4z2f'2^f'4 | ^d'3f'3^d'6z2f'2 | "Bbm"^f'2^f'2^f'4z2^f'2^f'4 | f'3^f'3=f'6z2^f'2 |
+"Ebm"^f'2^f'2^f'4z2^f'2^f'4 | ^d'3f'3^d'6z2f'2 | "Ebm"^d'4^c'2^a2^a8 | ^f2^g2^f2^a2^d'8 |
+"Abm"b2^d'2^d'4z2f'2^f'4 | ^d'3f'3^d'6z2f'2 | "Bbm"^f'2^f'2^f'4z2^f'2^f'4 | f'3^f'3=f'6z2^f'2 |
+"Ebm"^f''2^f''2^f''4z2^f''2^f''4 | ^d''3f''3^d''6z2f''2 | "Ebm"^d''4^c''2^a'2^a'8 | ^f'2^g'2^f'2^a'2^d''8 |
+"B"b8^a6b2 | ^a12^f4 | "C#"f8^d6f2 | ^d12^d4 |
+"Ebm"^d8^d6f2 | ^d12^d4 | "Ebm"^d6^d6^d4 | ^d8^d8 |
+"B"b8^a6b2 | ^a12^f4 | "C#"f8^d6f2 | ^d12^d4 |
+"Ebm"^d8^d6f2 | ^d12^d4 | "Ebm"^d6^d6^d4 | ^d8^d8 |

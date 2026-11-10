@@ -1,0 +1,17 @@
+X:1
+T:Packet Inferno
+C:Cyber Race OST (jump-up rock)
+N:Key Gphr (phrygian); written in K:C with explicit accidentals
+M:4/4
+L:1/16
+Q:1/4=176
+K:C
+%%MIDI program 81
+"Gm"f'2^g'2^a'4z2^g'2f'4 | g'3f'3d'6z2c'2 | "Dm"d'2f'2^g'4z2=g'2d'4 | d'3c'3^g6z2=g2 |
+"Eb"^a2d'2^d'4z2=d'2^a4 | ^a3^g3=g6z2f2 | "Cm"g4f2g2^a8 | c'2^d'2=d'2c'2c'8 |
+"Gm"f'2^g'2^a'4z2^g'2f'4 | g'3f'3d'6z2c'2 | "Dm"d'2f'2^g'4z2=g'2d'4 | d'3c'3^g6z2=g2 |
+"Eb"^a'2d''2^d''4z2=d''2^a'4 | ^a'3^g'3=g'6z2f'2 | "Cm"g'4f'2g'2^a'8 | c''2^d''2=d''2c''2c''8 |
+"Gm"g'6g'6f'4 | d'8^a8 | "Eb"^a6^a6g4 | g8g8 |
+"Cm"g6g6g4 | g8g8 | "Dm"g4g4^g8 | g4g4d'8 |
+"Gm"g'6g'6f'4 | d'8^a8 | "Eb"^a6^a6g4 | g8g8 |
+"Cm"g6g6g4 | g8g8 | "Dm"g4g4^g8 | g4g4d'8 |

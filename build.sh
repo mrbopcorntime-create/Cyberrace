@@ -22,6 +22,8 @@ rm -rf $OUT && mkdir -p $OUT/classes $OUT/dex $OUT/assets/www
 echo "[1/7] bundle game"
 tools/bundle.sh --minify
 cp www/index.html www/game.js $OUT/assets/www/
+# adaptive music (Ogg Vorbis stems + manifest) for the native AdaptiveAudioManager
+[ -d android/assets/music ] && cp -r android/assets/music $OUT/assets/
 
 echo "[2/7] icon"
 [ -f android/res/mipmap-xxxhdpi/ic_launcher.png ] || python3 tools/make_icon.py android/res/mipmap-xxxhdpi/ic_launcher.png
@@ -39,7 +41,7 @@ echo "[5/7] aapt2"
 $AAPT2 compile --dir android/res -o $OUT/res.zip
 $AAPT2 link -o $OUT/base.apk -I $ANDROID_JAR --manifest android/AndroidManifest.xml \
   -A $OUT/assets --min-sdk-version 26 --target-sdk-version 34 \
-  --version-code $VERSION_CODE --version-name $VERSION_NAME $OUT/res.zip
+  --version-code $VERSION_CODE --version-name $VERSION_NAME -0 ogg -0 json $OUT/res.zip
 (cd $OUT/dex && zip -q -9 ../base.apk classes.dex)
 
 echo "[6/7] align"

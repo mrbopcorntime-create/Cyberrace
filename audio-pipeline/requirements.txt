@@ -1,0 +1,15 @@
+# CPU stages (separation fallback, menu assets, mastering, sync)
+numpy>=1.26
+scipy>=1.11
+soundfile>=0.12
+librosa>=0.10
+soxr>=0.3
+pyloudnorm>=0.1.1
+onnxruntime>=1.17
+music21>=9.1          # lead-sheet validation
+# GPU stages (install per tool; separate venvs recommended)
+# demucs>=4.0.1
+# diffusers>=0.39 transformers accelerate torch     # ACE-Step 1.5
+# git+https://github.com/facebookresearch/audiocraft # MusicGen / MusicGen-Style
+# ./yue2_infer-0.1.5-py3-none-any.whl                # YuE2-3B (from m-a-p/YuE2-3B)
+# system: ffmpeg (libvorbis), rubberband (R3) for align_loop.py

@@ -1,0 +1,17 @@
+X:1
+T:Burn-In Basin
+C:Cyber Race OST (jump-up rock)
+N:Key Fm (harmonic); written in K:C with explicit accidentals
+M:4/4
+L:1/16
+Q:1/4=176
+K:C
+%%MIDI program 81
+"Fm"c'2^a2c'4z2^c'2=c'4 | e'3c'3c'6z2^a2 | "Ab"c'2^a2c'4z2^c'2=c'4 | e'3c'3c'6z2^a2 |
+"Em"^a2^g2^a4z2c'2^a4 | ^c'3^a3^a6z2^g2 | "Bbm"f4e2f2^c8 | ^c2^c2^c2^c2^a8 |
+"Fm"c'2^a2c'4z2^c'2=c'4 | e'3c'3c'6z2^a2 | "Ab"c'2^a2c'4z2^c'2=c'4 | e'3c'3c'6z2^a2 |
+"Em"^a'2^g'2^a'4z2c''2^a'4 | ^c''3^a'3^a'6z2^g'2 | "Bbm"f'4e'2f'2^c'8 | ^c'2^c'2^c'2^c'2^a'8 |
+"Bbm"f'6^c'6^a4 | ^a8^g8 | "C"^a6g6f4 | g8f8 |
+"Fm"f6f6f4 | f8f8 | "Fm"f4f4f8 | f4f4f8 |
+"Bbm"f'6^c'6^a4 | ^a8^g8 | "C"^a6g6f4 | g8f8 |
+"Fm"f6f6f4 | f8f8 | "Fm"f4f4f8 | f4f4f8 |

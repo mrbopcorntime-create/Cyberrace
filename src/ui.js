@@ -2,6 +2,7 @@ import { CHARACTERS, CLASSES, CUPS, CLOCKS, ACHIEVEMENTS, PAINTS, NEONS, TRAILS,
 import { Track } from './track.js';
 import { hex, fmtTime, ordinal } from './util.js';
 import { saveProfile, upgradeSpent } from './save.js';
+import { CAM_ZOOM } from './race.js';
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const statBar = (label, v) => `<div class="stat"><span>${label}</span><div class="sb"><i style="width:${v * 10}%"></i></div></div>`;
@@ -35,6 +36,7 @@ export class UI {
     this.focusFirst();
     this.update3d();
     this.prefetch();
+    this.game.audio.menuScreen(name);
   }
   // start rendering a cup's score as soon as it's likely to be raced
   prefetch() {
@@ -167,6 +169,7 @@ export class UI {
       case 'resume': g.resume(); break;
       case 'restart': g.restartRace(); break;
       case 'togglecam': g.toggleCamera(); this.refresh(); break;
+      case 'camzoom': g.setCamZoom(ds.v); this.refresh(); break;
       case 'quitrace': g.quitToMenu(); break;
       case 'psettings': this.show('settings'); break;
       // post race
@@ -183,6 +186,8 @@ export class UI {
     this.game.saveSettings();
     if (k === 'musicVol' || k === 'sfxVol') this.game.audio.applyVolumes();
     if (k === 'fpsCap') st[k] = +v;
+    if (k === 'camZoom' && this.game.race) this.game.race.camZoom = v;
+    if (k === 'camera' && this.game.race) this.game.race.camMode = v;
     if (k === 'quality' || k === 'dynamicRes') this.game.applyQuality();
     this.game.input.applyLayout();
   }
@@ -391,7 +396,7 @@ export class UI {
       <section data-f="1"><h3>AIR, SLIPSTREAM, STRIPS</h3><p>Tap DRIFT while airborne to arm a <b>perfect landing</b> boost. Ride close behind a rival to charge the slipstream ring on your speedometer. Boost strips sit before every ramp — miss them and you may not clear the gap.</p></section>
       <section data-f="1"><h3>ITEMS</h3><p>Capsules give items into two slots. Leaders get defensive items; racers at the back get speed and firepower.</p><div class="fzs">${items}</div></section>
       <section data-f="1"><h3>FUSION — COMBINE BOTH SLOTS</h3><p>With two items held, press FUSE (or tap the item slots) to merge them into one empowered item. Every pairing makes something different:</p><div class="fzs">${fz}</div></section>
-      <section data-f="1"><h3>CONTROLLER</h3><p>RT accelerate · LT brake/reverse · Left stick steer · R1 drift · L1 or X item · Y fuse · B melee · Right-stick click camera · Push right stick down to look back · START pause.</p></section>
+      <section data-f="1"><h3>CONTROLLER</h3><p>RT accelerate · LT brake/reverse · Left stick steer · R1 drift · L1 or X item · Y fuse · B melee · Right-stick click camera · D-pad up/down view distance · Push right stick down to look back · START pause.</p></section>
       <section data-f="1"><h3>TOUCH</h3><p>Left thumb steers (floating stick, buttons, or tilt). Right thumb: GO, DRIFT, ITEM, STRIKE, BRAKE. Slide your thumb between GO and DRIFT without lifting. Turn on Auto-Accelerate in Settings for one-thumb play.</p></section>
     </div>`;
   }
@@ -407,6 +412,7 @@ export class UI {
       <div class="srow"><span>HANDEDNESS</span>${opt('leftHanded', false, 'RIGHT')}${opt('leftHanded', true, 'LEFT')}</div>
       ${sl('buttonScale', 0.7, 1.4, 0.05, 'BUTTON SIZE')}${sl('buttonOpacity', 0.2, 1, 0.05, 'BUTTON OPACITY')}
       <div class="srow"><span>CAMERA</span>${opt('camera', 'chase', 'OVER-SHOULDER')}${opt('camera', 'iso', 'ISOMETRIC')}</div>
+      <div class="srow"><span>VIEW DISTANCE</span>${Object.entries(CAM_ZOOM).map(([id, z]) => opt('camZoom', id, z.label)).join('')}</div>
       <div class="srow"><span>UPSCALER</span>${opt('quality', 'quality', 'QUALITY')}${opt('quality', 'balanced', 'BALANCED')}${opt('quality', 'performance', 'PERFORMANCE')}${opt('quality', 'native', 'NATIVE')}</div>
       <div class="srow"><span>DYNAMIC RES</span>${opt('dynamicRes', true, 'ON')}${opt('dynamicRes', false, 'OFF')}</div>
       <div class="srow"><span>FRAME RATE</span>${opt('fpsCap', '60', '60 FPS')}${opt('fpsCap', '30', '30 FPS')}</div>
@@ -429,6 +435,7 @@ export class UI {
         <button class="primary" data-act="resume">RESUME</button>
         <button data-act="restart">RESTART RACE</button>
         <button data-act="togglecam">CAMERA: ${r && r.camMode === 'iso' ? 'ISOMETRIC' : 'OVER-SHOULDER'}</button>
+        <div class="zoomrow"><span>VIEW DISTANCE</span><div>${Object.entries(CAM_ZOOM).map(([id, z]) => `<button class="tab ${(r ? r.camZoom : this.game.settings.camZoom) === id ? 'selected' : ''}" data-act="camzoom" data-v="${id}" data-key="z_${id}">${z.label}</button>`).join('')}</div></div>
         <button data-act="psettings">SETTINGS</button>
         <button data-act="quitrace">QUIT TO MENU</button>
       </nav></div>`;

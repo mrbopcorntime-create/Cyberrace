@@ -7,7 +7,7 @@ export class Input {
   constructor(game) {
     this.game = game;
     this.state = { steer: 0, throttle: 0, brake: 0, drift: false, lookBack: false };
-    this.edges = { item: false, melee: false, fuse: false, drift: false, camera: false, pause: false };
+    this.edges = { item: false, melee: false, fuse: false, drift: false, camera: false, pause: false, zoom: false };
     this.keys = new Set();
     this.pad = { keys: new Set(), axes: [0, 0, 0, 0, 0, 0, 0, 0], active: false, lastT: 0 };
     this.touch = { steer: 0, accel: false, brake: false, drift: false, held: new Map() };
@@ -28,6 +28,7 @@ export class Input {
       if (e.code === 'KeyL' || e.code === 'KeyQ') this.edges.melee = true;
       if (e.code === 'KeyF') this.edges.fuse = true;
       if (e.code === 'KeyC') this.edges.camera = true;
+      if (e.code === 'KeyV') this.edges.zoom = true;
       if (e.code === 'KeyP') this.edges.pause = true;
       if (e.code === 'Space' || e.code === 'ShiftLeft' || e.code === 'KeyJ') this.edges.drift = true;
     });
@@ -72,6 +73,8 @@ export class Input {
       case K.RS: case K.SELECT: this.edges.camera = true; break;
       case K.START: this._nav('start'); break;
     }
+    // D-pad up/down while racing (no menu open): view distance closer / farther
+    if ((code === K.UP || code === K.DOWN) && g.race && g.state === 'race' && !g.race.paused && !g.ui.screen) { g.cycleCamZoom(code === K.UP ? -1 : 1); return; }
     const nav = { [K.UP]: 'up', [K.DOWN]: 'down', [K.LEFT]: 'left', [K.RIGHT]: 'right', [K.A]: 'ok', [K.CENTER]: 'ok', [K.ENTER]: 'ok', [K.B]: 'back', [K.ESC]: 'back' }[code];
     if (nav) this._nav(nav);
     if (code === K.L2) this._nav('prev');
@@ -146,6 +149,7 @@ export class Input {
     if (e.melee) inp.melee = true;
     if (e.fuse) inp.fuse = true;
     race.lookBack = s.lookBack;
+    if (e.zoom) { e.zoom = false; this.game.cycleCamZoom(1); }
     if (e.camera) { race.camMode = race.camMode === 'chase' ? 'iso' : 'chase'; this.game.settings.camera = race.camMode; this.game.saveSettings(); }
   }
   clearEdges() { for (const k in this.edges) this.edges[k] = false; }

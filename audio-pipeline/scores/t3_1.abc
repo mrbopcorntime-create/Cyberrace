@@ -1,0 +1,17 @@
+X:1
+T:Backprop Bend
+C:Cyber Race OST (liquid neural)
+N:Key Gm (aeolian); written in K:C with explicit accidentals
+M:4/4
+L:1/16
+Q:1/4=174
+K:C
+%%MIDI program 81
+"Cm"z2c'2^a2g4f2^d4 | z2^d2^d2^d4f2^d4 | "Dm"z2^d2^d2^d4^d2^d4 | z2^d2^d2^d4f2^d4 |
+"Gm"z2^d2^d2^d4^d2^d4 | z2^d2^d2^d4f2^d4 | "Gm"f3^d3g2g4a2g2 | ^a6z2g2=a2g4 |
+"Cm"z2c'2^a2g4f2^d4 | z2^d2^d2^d4f2^d4 | "Dm"z2^d2^d2^d4^d2^d4 | z2^d2^d2^d4f2^d4 |
+"Gm"z2^d'2^d'2^d'4^d'2^d'4 | z2^d'2^d'2^d'4f'2^d'4 | "Gm"f'3^d'3g'2g'4a'2g'2 | ^a'6z2g'2=a'2g'4 |
+"Eb"g'6^d'6=d'4 | ^d'8=d'8 | "F"^d'6c'6a4 | a8g8 |
+"Gm"g6g6g4 | g8g8 | "Gm"g4g4g8 | g4g4g8 |
+"Eb"g'6^d'6=d'4 | ^d'8=d'8 | "F"^d'6c'6a4 | a8g8 |
+"Gm"g6g6g4 | g8g8 | "Gm"g4g4g8 | g4g4g8 |

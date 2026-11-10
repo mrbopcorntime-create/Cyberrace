@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { Pipeline, PRESETS, installPCSS } from './render/pipeline.js';
 import { MIP_BIAS } from './track.js';
 import { CHARACTERS, CUPS, CLOCKS, STARTERS, PAINTS, NEONS, POINTS } from './data.js';
-import { Race } from './race.js';
+import { Race, CAM_ZOOM, CAM_ZOOM_IDS } from './race.js';
 import { Input } from './input.js';
 import { Audio } from './audio/index.js';
 import { HUD } from './hud.js';
@@ -179,7 +179,7 @@ class Game {
     const race = this.race;
     if (race && this.state === 'race') {
       if (this.input.edges.pause && !race.over) { this.input.edges.pause = false; if (race.paused) this.resume(); else this.pause(); }
-      if (!race.paused) {
+      if (!race.paused && this.ui.screen !== 'loading') {   // countdown starts when the loading screen closes
         this.acc += dt;
         let n = 0;
         while (this.acc >= 1 / 60 && n < 4) { race.update(1 / 60); this.input.clearEdges(); this.acc -= 1 / 60; n++; }
@@ -258,7 +258,7 @@ class Game {
     this.ui.loadInfo = { cup: cup.name + (opts.mode === 'cup' ? ` · RACE ${opts.track + 1}/4` : opts.mode === 'tt' ? ' · TIME TRIAL' : ''), track: cup.tracks[opts.track].name, color: '#' + cup.pal.a.toString(16).padStart(6, '0'), tip: TIPS[Math.floor(Math.random() * TIPS.length)] };
     this.ui.show('loading', false);
     this.audio.stopMenuMusic(0.6);
-    const musicReady = this.audio.prepareCup(cup);
+    const musicReady = Promise.all([this.audio.prepareCup(cup), this.audio.prepareTrack(opts.cup, opts.track)]);
     setTimeout(() => {
       this.disposeRace();
       try {
@@ -303,6 +303,16 @@ class Game {
   restartRace() {
     if (this.cupState && this.lastOpts.mode === 'cup') this.lastOpts.grid = this.cupGrid();
     this.loadRace(this.lastOpts);
+  }
+  setCamZoom(id) {
+    this.settings.camZoom = id; this.saveSettings();
+    if (this.race) this.race.camZoom = id;
+  }
+  cycleCamZoom(dir = 1) {
+    const ids = CAM_ZOOM_IDS, cur = ids.indexOf(this.race ? this.race.camZoom : this.settings.camZoom || 'standard');
+    const id = ids[(Math.max(0, cur) + dir + ids.length) % ids.length];
+    this.setCamZoom(id);
+    if (this.race && !this.race.paused) this.hud.banner && this.hud.banner('VIEW: ' + CAM_ZOOM[id].label);
   }
   toggleCamera() { if (this.race) { this.race.camMode = this.race.camMode === 'chase' ? 'iso' : 'chase'; this.settings.camera = this.race.camMode; this.saveSettings(); } }
   quitToMenu() {

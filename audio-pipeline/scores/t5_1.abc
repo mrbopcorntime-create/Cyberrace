@@ -1,0 +1,17 @@
+X:1
+T:Kernel Panic
+C:Cyber Race OST (singularity anthem)
+N:Key Fm (harmonic); written in K:C with explicit accidentals
+M:4/4
+L:1/16
+Q:1/4=178
+K:C
+%%MIDI program 81
+"C#"^c'4e'2f'2^c'8 | f'2^c'2e'2^c'2=c'8 | "Em"^c'4e'2f'2^c'8 | e'2c'2^c'2=c'2^a8 |
+"Fm"c'4^c'2e'2=c'8 | e'2c'2^c'2=c'2^g8 | "Fm"f2e2f4z2e2^c4 | e3f3e6z2f2 |
+"C#"^c'4e'2f'2^c'8 | f'2^c'2e'2^c'2=c'8 | "Em"^c'4e'2f'2^c'8 | e'2c'2^c'2=c'2^a8 |
+"Fm"c''4^c''2e''2=c''8 | e''2c''2^c''2=c''2^g'8 | "Fm"f'2e'2f'4z2e'2^c'4 | e'3f'3e'6z2f'2 |
+"Bbm"f'6f'6^c'4 | ^a8^a8 | "C"c'6c'6g4 | f8g8 |
+"Fm"^g6^g6f4 | f8f8 | "Fm"f4f4f8 | f4^g4f8 |
+"Bbm"f'6f'6^c'4 | ^a8^a8 | "C"c'6c'6g4 | f8g8 |
+"Fm"^g6^g6f4 | f8f8 | "Fm"f4f4f8 | f4^g4f8 |

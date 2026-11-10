@@ -1,0 +1,17 @@
+X:1
+T:Motherboard Mile
+C:Cyber Race OST (neon roller)
+N:Key Ddor (dorian); written in K:C with explicit accidentals
+M:4/4
+L:1/16
+Q:1/4=174
+K:C
+%%MIDI program 81
+"Dm"z2f2g2a4g2a4 | z2g2b2c'4b2a4 | "F"z2f2g2a4g2a4 | z2g2b2c'4b2a4 |
+"C"z2g2a2b4a2b4 | z2a2c'2c'4b2g4 | "G"f3e3d2B4B2B2 | B6z2B2B2g4 |
+"Dm"z2f2g2a4g2a4 | z2g2b2c'4b2a4 | "F"z2f2g2a4g2a4 | z2g2b2c'4b2a4 |
+"C"z2g'2a'2b'4a'2b'4 | z2a'2c''2c''4b'2g'4 | "G"f'3e'3d'2b4b2b2 | b6z2b2b2g'4 |
+"G"d'6d'6d'4 | d'8b8 | "Am"c'6c'6c'4 | c'8a8 |
+"Dm"a6a6a4 | a8f8 | "Dm"d4d4d8 | f4f4d8 |
+"G"d'6d'6d'4 | d'8b8 | "Am"c'6c'6c'4 | c'8a8 |
+"Dm"a6a6a4 | a8f8 | "Dm"d4d4d8 | f4f4d8 |

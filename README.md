@@ -12,18 +12,29 @@ Three.js WebGL game hosted in a native fullscreen Android activity. All audio is
 - 72 achievements, garage (paint / neon / trails / tuning with a power budget), 3 difficulty clock speeds, time trial records
 - Touch (stick / buttons / tilt, auto-accelerate, left-handed, resizable) and full controller support
 
-## Audio (v1.1)
-All audio is rendered on-device (Web Workers) from a sample-level synth — no sample files.
-- Interactive score: Groove (French-touch electro-funk, 129 BPM) / Combat (neurofunk breaks + reese, 172 BPM) / Overclock (DnB, 174 BPM on final lap). Tiers share one 11.163 s loop (3:4 tempo ratio) and crossfade sample-aligned.
-- Stems mastered to −14 LUFS integrated, ≤ −1 dBTP; loop boundaries rotated onto zero crossings. Master bus: true-peak look-ahead limiter (AudioWorklet, 4x oversampled detection) at −1.0 dBTP.
-- Buses: music / engines / SFX / ambience / UI; 35 Hz high-pass on all; 0.8–4.5 kHz carved in music+engines for cues; ducking matrix (−4…−6 dB, 10 ms attack, 250 ms release); music kick → engine sub-band sidechain; EMP low-pass choke and trap high-pass on the victim.
-- Engines: per-class synthesis with idle/low/mid/redline blend, gears, slip and Doppler.
+## Audio (v1.2 — adaptive stem score)
+- **Native adaptive music** (`android/java/.../audio/`): `AdaptiveAudioManager` decodes Ogg Vorbis stems (MediaCodec) and
+  `StemMixer` plays them sample-locked through a low-latency float AudioTrack. The game drives it via `window.CRAudio`
+  (`src/audio/native.js`): menu screens and race states switch layers on the beat/bar; bar 1 of each race song lands on GO.
+- **Menu: "Grid Runner"** (175.8 BPM) — its 32-bar build plays once under the title, then a seamless 32-bar loop of the
+  drop split into drums / bass / music for `main`, `select`, `lounge` (garage/settings), `loading` and `results` states.
+- **24 race songs, one per track** (172–180 BPM drum & bass, per-cup sub-genre), 5 stems each:
+  `grid` (pads over the countdown) → `cruise` → `race` (+lead) → `intense` (+top layer: pack racing, combat, boost) →
+  `final` (all layers, +4 BPM). Stems mastered to −14 LUFS / ≤ −1 dBTP; ABC lead sheets in `audio-pipeline/scores/`.
+- Pause = low-pass + duck; EMP = low-pass choke; countdown/lock-on ducks; engine sub-band sidechain locked to each song's
+  kick grid via the native beat clock. SFX, engines and win/lose stingers stay in WebAudio (rendered on-device).
+- Production pipeline (Demucs / MDX-Net, MusicGen, ACE-Step 1.5, MiniMax, YuE2, tempo-sync, mastering):
+  see `audio-pipeline/README.md`. In a desktop browser the original procedural WebAudio score is used.
+
+## Camera (v1.2)
+Five view-distance presets — CLOSE · NEAR · STANDARD · FAR · WIDE — in the pause menu and Settings (persisted, eased live).
+Controller: D-pad ↑/↓ while racing. Keyboard: V.
 
 ## Rendering (v1.1)
 Half-float HDR scene at 0.50–0.67x (dynamic) or native → velocity pass → TAA (jitter, motion vectors, variance clipping) → HDR bloom → EASU-style edge-adaptive upscale → RCAS sharpening → ACES → native output. PCSS shadows (2048²), PBR vehicles with micro-detail normal maps and LODs, 2x track/texture density, 30/60 fps lock.
 
 ## Controller
-RT accelerate · LT brake · Left stick steer · R1 drift · L1/X item · Y fuse · B melee · R3 camera · right stick down look back · START pause
+RT accelerate · LT brake · Left stick steer · R1 drift · L1/X item · Y fuse · B melee · R3 camera · D-pad ↑↓ view distance · right stick down look back · START pause
 
 ## Build
 Requires Java 17+, Node 18+, Python 3 with Pillow, `zip`. Tests in `tools/` use a local Chrome.

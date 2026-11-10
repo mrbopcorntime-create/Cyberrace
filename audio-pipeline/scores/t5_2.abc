@@ -1,0 +1,17 @@
+X:1
+T:Event Horizon
+C:Cyber Race OST (singularity anthem)
+N:Key Bbdor (dorian); written in K:C with explicit accidentals
+M:4/4
+L:1/16
+Q:1/4=178
+K:C
+%%MIDI program 81
+"Bbm"^c3^d3f3^d3^c4 | ^A3^G3=G10 | "Eb"G3^G3^A3^G3=G4 | G3G3G10 |
+"Gm"G3^G3^A3^G3=G4 | G3G3G10 | "Fm"^G6=G2G6^G2 | G3G3^G4f6 |
+"Bbm"^c3^d3f3^d3^c4 | ^A3^G3=G10 | "Eb"G3^G3^A3^G3=G4 | G3G3G10 |
+"Gm"g3^g3^a3^g3=g4 | g3g3g10 | "Fm"^g6=g2g6^g2 | g3g3^g4f'6 |
+"Bbm"^a6^a6^a4 | f8^c8 | "Ab"^d6^d6^d4 | c8^A8 |
+"Gm"^A6^A6^A4 | ^A8^A8 | "Ab"^A4^A4c8 | ^A4^A4^g8 |
+"Bbm"^a6^a6^a4 | f8^c8 | "Ab"^d6^d6^d4 | c8^A8 |
+"Gm"^A6^A6^A4 | ^A8^A8 | "Ab"^A4^A4c8 | ^A4^A4^g8 |

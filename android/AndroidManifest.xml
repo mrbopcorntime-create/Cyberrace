@@ -16,6 +16,7 @@
         android:isGame="true"
         android:appCategory="game"
         android:allowBackup="true"
+        android:largeHeap="true"
         android:resizeableActivity="true"
         android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen">
 

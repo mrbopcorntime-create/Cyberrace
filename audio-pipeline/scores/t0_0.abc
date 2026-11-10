@@ -1,0 +1,17 @@
+X:1
+T:Boot Sequence
+C:Cyber Race OST (neon roller)
+N:Key Am (aeolian); written in K:C with explicit accidentals
+M:4/4
+L:1/16
+Q:1/4=174
+K:C
+%%MIDI program 81
+"Am"g3a3b3c'3a4 | g3a3a10 | "F"c'3c'3c'3c'3a4 | f3g3a10 |
+"C"c'3c'3c'3c'3b4 | g3a3b10 | "G"b6a2b6c'2 | c'3a3b4g'6 |
+"Am"g3a3b3c'3a4 | g3a3a10 | "F"c'3c'3c'3c'3a4 | f3g3a10 |
+"C"c''3c''3c''3c''3b'4 | g'3a'3b'10 | "G"b'6a'2b'6c''2 | c''3a'3b'4g''6 |
+"Am"a6a6g4 | a8g8 | "G"g6g6f4 | g8f8 |
+"F"f6f6e4 | f8e8 | "G"d4d4B8 | A4B4g8 |
+"Am"a6a6g4 | a8g8 | "G"g6g6f4 | g8f8 |
+"F"f6f6e4 | f8e8 | "G"d4d4B8 | A4B4g8 |

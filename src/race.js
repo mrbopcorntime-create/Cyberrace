@@ -1,4 +1,13 @@
 import * as THREE from 'three';
+// View-distance presets: chase distance/height (m), look-ahead, FOV offset; iso offsets scale by `iso`
+export const CAM_ZOOM = {
+  close: { label: 'CLOSE', d: 4.3, h: 1.75, look: 5.5, up: 1.1, fov: -4, iso: 0.68 },
+  near: { label: 'NEAR', d: 5.7, h: 2.35, look: 6.2, up: 1.25, fov: -2, iso: 0.84 },
+  standard: { label: 'STANDARD', d: 7.2, h: 3.0, look: 7, up: 1.4, fov: 0, iso: 1 },
+  far: { label: 'FAR', d: 9.6, h: 3.9, look: 8, up: 1.6, fov: 2, iso: 1.25 },
+  wide: { label: 'WIDE', d: 12.5, h: 5.2, look: 9.5, up: 1.8, fov: 4, iso: 1.55 },
+};
+export const CAM_ZOOM_IDS = Object.keys(CAM_ZOOM);
 import { CUPS, CHARACTERS, CLASSES, LAPS, POINTS, PLACE_BITS, FUSION_IDS, itemInfo, STARTERS } from './data.js';
 import { Track, HALF_W } from './track.js';
 import { Racer, DRIFT_COLORS } from './racer.js';
@@ -19,6 +28,8 @@ export class Race {
     this.camera = new THREE.PerspectiveCamera(72, 16 / 9, 0.3, 2600);
     this.time = -4.2; this.started = false; this.over = false; this.paused = false;
     this.finishCount = 0; this.camMode = game.settings.camera || 'chase';
+    this.camZoom = CAM_ZOOM[game.settings.camZoom] ? game.settings.camZoom : 'standard';
+    this.zoomK = CAM_ZOOM[this.camZoom].d; // smoothed chase distance (eases between presets)
     this.shake = 0; this.lookBack = false;
     this.flags = {}; this.st = newRaceStats(); this.feed = [];
     this.barrageHits = 0; this.barrageT = 0;
@@ -333,20 +344,24 @@ export class Race {
     const spdN = clamp(pl.speed / pl.top, 0, 1.5);
     let pos, look;
     const base = pl.worldPos;
+    const Z = CAM_ZOOM[this.camZoom] || CAM_ZOOM.standard;
+    this.zoomK = damp(this.zoomK, Z.d, 6, dt);
+    const zs = this.zoomK / Z.d;            // eases height/look with the distance while a preset changes
     if (this.camMode === 'iso') {
       // high, track-aligned isometric angle
       const side = _f.r;
-      pos = _v.copy(base).addScaledVector(_f.t, -17 - spdN * 4).addScaledVector(side, -9).add(new THREE.Vector3(0, 24, 0));
+      const k = Z.iso * zs;
+      pos = _v.copy(base).addScaledVector(_f.t, (-17 - spdN * 4) * k).addScaledVector(side, -9 * k).add(new THREE.Vector3(0, 24 * k, 0));
       look = _v2.copy(base).addScaledVector(_f.t, 10);
       this.fov = damp(this.fov, 50, 3, dt);
     } else {
       // over-the-shoulder chase, blended between car heading and track heading for stability
       const fwd = new THREE.Vector3().copy(_f.t).lerp(pl.worldFwd, pl.spinT > 0 ? 0 : 0.35).normalize();
-      const dist = 7.2 + spdN * 1.6;
-      pos = _v.copy(base).addScaledVector(fwd, this.lookBack ? dist : -dist).addScaledVector(up, 3.0 + (pl.air ? 0.6 : 0));
-      look = _v2.copy(base).addScaledVector(fwd, this.lookBack ? -8 : 7).addScaledVector(up, 1.4);
+      const dist = this.zoomK + spdN * 1.6 * (Z.d / 7.2);
+      pos = _v.copy(base).addScaledVector(fwd, this.lookBack ? dist : -dist).addScaledVector(up, Z.h * zs + (pl.air ? 0.6 : 0));
+      look = _v2.copy(base).addScaledVector(fwd, this.lookBack ? -(Z.look + 1) : Z.look).addScaledVector(up, Z.up);
       const boostF = pl.boostT > 0 ? 10 : 0;
-      this.fov = damp(this.fov, 68 + spdN * 10 + boostF, 4, dt);
+      this.fov = damp(this.fov, 68 + Z.fov + spdN * 10 + boostF, 4, dt);
     }
     // keep camera above the road surface
     if (!this.camInit) { this.camPos.copy(pos); this.camLook.copy(look); this.camInit = true; }

@@ -1,0 +1,1854 @@
+{
+ "version": 1,
+ "sampleRate": 48000,
+ "songs": {
+  "menu": {
+   "title": "Grid Runner",
+   "bpm": 175.775,
+   "loopFrames": 2097227,
+   "introFile": "menu/intro.ogg",
+   "introFrames": 2106500,
+   "stems": {
+    "drums": "menu/drums.ogg",
+    "bass": "menu/bass.ogg",
+    "music": "menu/music.ogg"
+   },
+   "states": {
+    "main": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "music": 1
+     }
+    },
+    "select": {
+     "gains": {
+      "drums": 0.75,
+      "bass": 1,
+      "music": 1
+     },
+     "lowpass": 9000
+    },
+    "lounge": {
+     "gains": {
+      "drums": 0,
+      "bass": 0.8,
+      "music": 1
+     },
+     "lowpass": 2600
+    },
+    "loading": {
+     "gains": {
+      "drums": 0,
+      "bass": 0,
+      "music": 1
+     },
+     "lowpass": 1100
+    },
+    "results": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "music": 1
+     }
+    }
+   }
+  },
+  "t0_0": {
+   "title": "Boot Sequence",
+   "cup": "CIRCUIT CUP",
+   "style": "neon roller",
+   "bpm": 174,
+   "loopFrames": 2118621,
+   "stems": {
+    "drums": "t0_0/drums.ogg",
+    "bass": "t0_0/bass.ogg",
+    "harm": "t0_0/harm.ogg",
+    "lead": "t0_0/lead.ogg",
+    "top": "t0_0/top.ogg"
+   },
+   "kick": [
+    [
+     0,
+     10
+    ],
+    [
+     0,
+     2,
+     10
+    ]
+   ],
+   "finalRate": 1.02299,
+   "states": {
+    "grid": {
+     "gains": {
+      "drums": 0,
+      "bass": 0.55,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     },
+     "lowpass": 1400
+    },
+    "cruise": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     }
+    },
+    "race": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 0
+     }
+    },
+    "intense": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    },
+    "final": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    }
+   }
+  },
+  "t5_3": {
+   "title": "Singularity",
+   "cup": "SINGULARITY CUP",
+   "style": "singularity anthem",
+   "bpm": 180,
+   "loopFrames": 2048000,
+   "stems": {
+    "drums": "t5_3/drums.ogg",
+    "bass": "t5_3/bass.ogg",
+    "harm": "t5_3/harm.ogg",
+    "lead": "t5_3/lead.ogg",
+    "top": "t5_3/top.ogg"
+   },
+   "kick": [
+    [
+     0,
+     2,
+     10,
+     11
+    ],
+    [
+     0,
+     2,
+     10
+    ]
+   ],
+   "finalRate": 1.02222,
+   "states": {
+    "grid": {
+     "gains": {
+      "drums": 0,
+      "bass": 0.55,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     },
+     "lowpass": 1400
+    },
+    "cruise": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     }
+    },
+    "race": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 0
+     }
+    },
+    "intense": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    },
+    "final": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    }
+   }
+  },
+  "t0_1": {
+   "title": "Motherboard Mile",
+   "cup": "CIRCUIT CUP",
+   "style": "neon roller",
+   "bpm": 174,
+   "loopFrames": 2118621,
+   "stems": {
+    "drums": "t0_1/drums.ogg",
+    "bass": "t0_1/bass.ogg",
+    "harm": "t0_1/harm.ogg",
+    "lead": "t0_1/lead.ogg",
+    "top": "t0_1/top.ogg"
+   },
+   "kick": [
+    [
+     0,
+     10
+    ],
+    [
+     0,
+     2,
+     10
+    ]
+   ],
+   "finalRate": 1.02299,
+   "states": {
+    "grid": {
+     "gains": {
+      "drums": 0,
+      "bass": 0.55,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     },
+     "lowpass": 1400
+    },
+    "cruise": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     }
+    },
+    "race": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 0
+     }
+    },
+    "intense": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    },
+    "final": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    }
+   }
+  },
+  "t0_2": {
+   "title": "Bus Lane Bypass",
+   "cup": "CIRCUIT CUP",
+   "style": "neon roller",
+   "bpm": 174,
+   "loopFrames": 2118621,
+   "stems": {
+    "drums": "t0_2/drums.ogg",
+    "bass": "t0_2/bass.ogg",
+    "harm": "t0_2/harm.ogg",
+    "lead": "t0_2/lead.ogg",
+    "top": "t0_2/top.ogg"
+   },
+   "kick": [
+    [
+     0,
+     10
+    ],
+    [
+     0,
+     2,
+     10
+    ]
+   ],
+   "finalRate": 1.02299,
+   "states": {
+    "grid": {
+     "gains": {
+      "drums": 0,
+      "bass": 0.55,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     },
+     "lowpass": 1400
+    },
+    "cruise": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     }
+    },
+    "race": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 0
+     }
+    },
+    "intense": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    },
+    "final": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    }
+   }
+  },
+  "t0_3": {
+   "title": "Overclock Oval",
+   "cup": "CIRCUIT CUP",
+   "style": "neon roller",
+   "bpm": 176,
+   "loopFrames": 2094545,
+   "stems": {
+    "drums": "t0_3/drums.ogg",
+    "bass": "t0_3/bass.ogg",
+    "harm": "t0_3/harm.ogg",
+    "lead": "t0_3/lead.ogg",
+    "top": "t0_3/top.ogg"
+   },
+   "kick": [
+    [
+     0,
+     10
+    ],
+    [
+     0,
+     2,
+     10
+    ]
+   ],
+   "finalRate": 1.02273,
+   "states": {
+    "grid": {
+     "gains": {
+      "drums": 0,
+      "bass": 0.55,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     },
+     "lowpass": 1400
+    },
+    "cruise": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     }
+    },
+    "race": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 0
+     }
+    },
+    "intense": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    },
+    "final": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    }
+   }
+  },
+  "t1_0": {
+   "title": "Packet Inferno",
+   "cup": "FIREWALL CUP",
+   "style": "jump-up rock",
+   "bpm": 176,
+   "loopFrames": 2094545,
+   "stems": {
+    "drums": "t1_0/drums.ogg",
+    "bass": "t1_0/bass.ogg",
+    "harm": "t1_0/harm.ogg",
+    "lead": "t1_0/lead.ogg",
+    "top": "t1_0/top.ogg"
+   },
+   "kick": [
+    [
+     0,
+     6,
+     10
+    ],
+    [
+     0,
+     6,
+     10,
+     13
+    ]
+   ],
+   "finalRate": 1.02273,
+   "states": {
+    "grid": {
+     "gains": {
+      "drums": 0,
+      "bass": 0.55,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     },
+     "lowpass": 1400
+    },
+    "cruise": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     }
+    },
+    "race": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 0
+     }
+    },
+    "intense": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    },
+    "final": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    }
+   }
+  },
+  "t1_1": {
+   "title": "Firewall Gauntlet",
+   "cup": "FIREWALL CUP",
+   "style": "jump-up rock",
+   "bpm": 176,
+   "loopFrames": 2094545,
+   "stems": {
+    "drums": "t1_1/drums.ogg",
+    "bass": "t1_1/bass.ogg",
+    "harm": "t1_1/harm.ogg",
+    "lead": "t1_1/lead.ogg",
+    "top": "t1_1/top.ogg"
+   },
+   "kick": [
+    [
+     0,
+     6,
+     10
+    ],
+    [
+     0,
+     6,
+     10,
+     13
+    ]
+   ],
+   "finalRate": 1.02273,
+   "states": {
+    "grid": {
+     "gains": {
+      "drums": 0,
+      "bass": 0.55,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     },
+     "lowpass": 1400
+    },
+    "cruise": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     }
+    },
+    "race": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 0
+     }
+    },
+    "intense": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    },
+    "final": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    }
+   }
+  },
+  "t1_2": {
+   "title": "Burn-In Basin",
+   "cup": "FIREWALL CUP",
+   "style": "jump-up rock",
+   "bpm": 176,
+   "loopFrames": 2094545,
+   "stems": {
+    "drums": "t1_2/drums.ogg",
+    "bass": "t1_2/bass.ogg",
+    "harm": "t1_2/harm.ogg",
+    "lead": "t1_2/lead.ogg",
+    "top": "t1_2/top.ogg"
+   },
+   "kick": [
+    [
+     0,
+     6,
+     10
+    ],
+    [
+     0,
+     6,
+     10,
+     13
+    ]
+   ],
+   "finalRate": 1.02273,
+   "states": {
+    "grid": {
+     "gains": {
+      "drums": 0,
+      "bass": 0.55,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     },
+     "lowpass": 1400
+    },
+    "cruise": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     }
+    },
+    "race": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 0
+     }
+    },
+    "intense": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    },
+    "final": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    }
+   }
+  },
+  "t1_3": {
+   "title": "Thermal Throttle",
+   "cup": "FIREWALL CUP",
+   "style": "jump-up rock",
+   "bpm": 178,
+   "loopFrames": 2071011,
+   "stems": {
+    "drums": "t1_3/drums.ogg",
+    "bass": "t1_3/bass.ogg",
+    "harm": "t1_3/harm.ogg",
+    "lead": "t1_3/lead.ogg",
+    "top": "t1_3/top.ogg"
+   },
+   "kick": [
+    [
+     0,
+     6,
+     10
+    ],
+    [
+     0,
+     6,
+     10,
+     13
+    ]
+   ],
+   "finalRate": 1.02247,
+   "states": {
+    "grid": {
+     "gains": {
+      "drums": 0,
+      "bass": 0.55,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     },
+     "lowpass": 1400
+    },
+    "cruise": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     }
+    },
+    "race": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 0
+     }
+    },
+    "intense": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    },
+    "final": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    }
+   }
+  },
+  "t2_0": {
+   "title": "Qubit Spiral",
+   "cup": "QUANTUM CUP",
+   "style": "quantum glitch",
+   "bpm": 172,
+   "loopFrames": 2143256,
+   "stems": {
+    "drums": "t2_0/drums.ogg",
+    "bass": "t2_0/bass.ogg",
+    "harm": "t2_0/harm.ogg",
+    "lead": "t2_0/lead.ogg",
+    "top": "t2_0/top.ogg"
+   },
+   "kick": [
+    [
+     0,
+     3,
+     10
+    ],
+    [
+     0,
+     6,
+     8
+    ]
+   ],
+   "finalRate": 1.02326,
+   "states": {
+    "grid": {
+     "gains": {
+      "drums": 0,
+      "bass": 0.55,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     },
+     "lowpass": 1400
+    },
+    "cruise": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     }
+    },
+    "race": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 0
+     }
+    },
+    "intense": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    },
+    "final": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    }
+   }
+  },
+  "t2_1": {
+   "title": "Superposition Split",
+   "cup": "QUANTUM CUP",
+   "style": "quantum glitch",
+   "bpm": 172,
+   "loopFrames": 2143256,
+   "stems": {
+    "drums": "t2_1/drums.ogg",
+    "bass": "t2_1/bass.ogg",
+    "harm": "t2_1/harm.ogg",
+    "lead": "t2_1/lead.ogg",
+    "top": "t2_1/top.ogg"
+   },
+   "kick": [
+    [
+     0,
+     3,
+     10
+    ],
+    [
+     0,
+     6,
+     8
+    ]
+   ],
+   "finalRate": 1.02326,
+   "states": {
+    "grid": {
+     "gains": {
+      "drums": 0,
+      "bass": 0.55,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     },
+     "lowpass": 1400
+    },
+    "cruise": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     }
+    },
+    "race": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 0
+     }
+    },
+    "intense": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    },
+    "final": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    }
+   }
+  },
+  "t2_2": {
+   "title": "Entanglement Loop",
+   "cup": "QUANTUM CUP",
+   "style": "quantum glitch",
+   "bpm": 172,
+   "loopFrames": 2143256,
+   "stems": {
+    "drums": "t2_2/drums.ogg",
+    "bass": "t2_2/bass.ogg",
+    "harm": "t2_2/harm.ogg",
+    "lead": "t2_2/lead.ogg",
+    "top": "t2_2/top.ogg"
+   },
+   "kick": [
+    [
+     0,
+     3,
+     10
+    ],
+    [
+     0,
+     6,
+     8
+    ]
+   ],
+   "finalRate": 1.02326,
+   "states": {
+    "grid": {
+     "gains": {
+      "drums": 0,
+      "bass": 0.55,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     },
+     "lowpass": 1400
+    },
+    "cruise": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     }
+    },
+    "race": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 0
+     }
+    },
+    "intense": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    },
+    "final": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    }
+   }
+  },
+  "t2_3": {
+   "title": "Decoherence Drop",
+   "cup": "QUANTUM CUP",
+   "style": "quantum glitch",
+   "bpm": 174,
+   "loopFrames": 2118621,
+   "stems": {
+    "drums": "t2_3/drums.ogg",
+    "bass": "t2_3/bass.ogg",
+    "harm": "t2_3/harm.ogg",
+    "lead": "t2_3/lead.ogg",
+    "top": "t2_3/top.ogg"
+   },
+   "kick": [
+    [
+     0,
+     3,
+     10
+    ],
+    [
+     0,
+     6,
+     8
+    ]
+   ],
+   "finalRate": 1.02299,
+   "states": {
+    "grid": {
+     "gains": {
+      "drums": 0,
+      "bass": 0.55,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     },
+     "lowpass": 1400
+    },
+    "cruise": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     }
+    },
+    "race": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 0
+     }
+    },
+    "intense": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    },
+    "final": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    }
+   }
+  },
+  "t3_0": {
+   "title": "Synapse Sprint",
+   "cup": "NEURAL CUP",
+   "style": "liquid neural",
+   "bpm": 174,
+   "loopFrames": 2118621,
+   "stems": {
+    "drums": "t3_0/drums.ogg",
+    "bass": "t3_0/bass.ogg",
+    "harm": "t3_0/harm.ogg",
+    "lead": "t3_0/lead.ogg",
+    "top": "t3_0/top.ogg"
+   },
+   "kick": [
+    [
+     0,
+     10
+    ],
+    [
+     0,
+     10
+    ]
+   ],
+   "finalRate": 1.02299,
+   "states": {
+    "grid": {
+     "gains": {
+      "drums": 0,
+      "bass": 0.55,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     },
+     "lowpass": 1400
+    },
+    "cruise": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     }
+    },
+    "race": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 0
+     }
+    },
+    "intense": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    },
+    "final": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    }
+   }
+  },
+  "t3_1": {
+   "title": "Backprop Bend",
+   "cup": "NEURAL CUP",
+   "style": "liquid neural",
+   "bpm": 174,
+   "loopFrames": 2118621,
+   "stems": {
+    "drums": "t3_1/drums.ogg",
+    "bass": "t3_1/bass.ogg",
+    "harm": "t3_1/harm.ogg",
+    "lead": "t3_1/lead.ogg",
+    "top": "t3_1/top.ogg"
+   },
+   "kick": [
+    [
+     0,
+     10
+    ],
+    [
+     0,
+     10
+    ]
+   ],
+   "finalRate": 1.02299,
+   "states": {
+    "grid": {
+     "gains": {
+      "drums": 0,
+      "bass": 0.55,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     },
+     "lowpass": 1400
+    },
+    "cruise": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     }
+    },
+    "race": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 0
+     }
+    },
+    "intense": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    },
+    "final": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    }
+   }
+  },
+  "t3_2": {
+   "title": "Gradient Descent",
+   "cup": "NEURAL CUP",
+   "style": "liquid neural",
+   "bpm": 174,
+   "loopFrames": 2118621,
+   "stems": {
+    "drums": "t3_2/drums.ogg",
+    "bass": "t3_2/bass.ogg",
+    "harm": "t3_2/harm.ogg",
+    "lead": "t3_2/lead.ogg",
+    "top": "t3_2/top.ogg"
+   },
+   "kick": [
+    [
+     0,
+     10
+    ],
+    [
+     0,
+     10
+    ]
+   ],
+   "finalRate": 1.02299,
+   "states": {
+    "grid": {
+     "gains": {
+      "drums": 0,
+      "bass": 0.55,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     },
+     "lowpass": 1400
+    },
+    "cruise": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     }
+    },
+    "race": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 0
+     }
+    },
+    "intense": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    },
+    "final": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    }
+   }
+  },
+  "t3_3": {
+   "title": "Deep Layer",
+   "cup": "NEURAL CUP",
+   "style": "liquid neural",
+   "bpm": 176,
+   "loopFrames": 2094545,
+   "stems": {
+    "drums": "t3_3/drums.ogg",
+    "bass": "t3_3/bass.ogg",
+    "harm": "t3_3/harm.ogg",
+    "lead": "t3_3/lead.ogg",
+    "top": "t3_3/top.ogg"
+   },
+   "kick": [
+    [
+     0,
+     10
+    ],
+    [
+     0,
+     10
+    ]
+   ],
+   "finalRate": 1.02273,
+   "states": {
+    "grid": {
+     "gains": {
+      "drums": 0,
+      "bass": 0.55,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     },
+     "lowpass": 1400
+    },
+    "cruise": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     }
+    },
+    "race": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 0
+     }
+    },
+    "intense": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    },
+    "final": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    }
+   }
+  },
+  "t4_0": {
+   "title": "Zero-Day Alley",
+   "cup": "DARKNET CUP",
+   "style": "darknet neurofunk",
+   "bpm": 176,
+   "loopFrames": 2094545,
+   "stems": {
+    "drums": "t4_0/drums.ogg",
+    "bass": "t4_0/bass.ogg",
+    "harm": "t4_0/harm.ogg",
+    "lead": "t4_0/lead.ogg",
+    "top": "t4_0/top.ogg"
+   },
+   "kick": [
+    [
+     0,
+     10,
+     11
+    ],
+    [
+     0,
+     2,
+     10
+    ]
+   ],
+   "finalRate": 1.02273,
+   "states": {
+    "grid": {
+     "gains": {
+      "drums": 0,
+      "bass": 0.55,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     },
+     "lowpass": 1400
+    },
+    "cruise": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     }
+    },
+    "race": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 0
+     }
+    },
+    "intense": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    },
+    "final": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    }
+   }
+  },
+  "t4_1": {
+   "title": "Rootkit Run",
+   "cup": "DARKNET CUP",
+   "style": "darknet neurofunk",
+   "bpm": 176,
+   "loopFrames": 2094545,
+   "stems": {
+    "drums": "t4_1/drums.ogg",
+    "bass": "t4_1/bass.ogg",
+    "harm": "t4_1/harm.ogg",
+    "lead": "t4_1/lead.ogg",
+    "top": "t4_1/top.ogg"
+   },
+   "kick": [
+    [
+     0,
+     10,
+     11
+    ],
+    [
+     0,
+     2,
+     10
+    ]
+   ],
+   "finalRate": 1.02273,
+   "states": {
+    "grid": {
+     "gains": {
+      "drums": 0,
+      "bass": 0.55,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     },
+     "lowpass": 1400
+    },
+    "cruise": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     }
+    },
+    "race": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 0
+     }
+    },
+    "intense": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    },
+    "final": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    }
+   }
+  },
+  "t4_2": {
+   "title": "Botnet Bridges",
+   "cup": "DARKNET CUP",
+   "style": "darknet neurofunk",
+   "bpm": 176,
+   "loopFrames": 2094545,
+   "stems": {
+    "drums": "t4_2/drums.ogg",
+    "bass": "t4_2/bass.ogg",
+    "harm": "t4_2/harm.ogg",
+    "lead": "t4_2/lead.ogg",
+    "top": "t4_2/top.ogg"
+   },
+   "kick": [
+    [
+     0,
+     10,
+     11
+    ],
+    [
+     0,
+     2,
+     10
+    ]
+   ],
+   "finalRate": 1.02273,
+   "states": {
+    "grid": {
+     "gains": {
+      "drums": 0,
+      "bass": 0.55,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     },
+     "lowpass": 1400
+    },
+    "cruise": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     }
+    },
+    "race": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 0
+     }
+    },
+    "intense": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    },
+    "final": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    }
+   }
+  },
+  "t4_3": {
+   "title": "Phantom Proxy",
+   "cup": "DARKNET CUP",
+   "style": "darknet neurofunk",
+   "bpm": 178,
+   "loopFrames": 2071011,
+   "stems": {
+    "drums": "t4_3/drums.ogg",
+    "bass": "t4_3/bass.ogg",
+    "harm": "t4_3/harm.ogg",
+    "lead": "t4_3/lead.ogg",
+    "top": "t4_3/top.ogg"
+   },
+   "kick": [
+    [
+     0,
+     10,
+     11
+    ],
+    [
+     0,
+     2,
+     10
+    ]
+   ],
+   "finalRate": 1.02247,
+   "states": {
+    "grid": {
+     "gains": {
+      "drums": 0,
+      "bass": 0.55,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     },
+     "lowpass": 1400
+    },
+    "cruise": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     }
+    },
+    "race": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 0
+     }
+    },
+    "intense": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    },
+    "final": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    }
+   }
+  },
+  "t5_0": {
+   "title": "Core Meltdown",
+   "cup": "SINGULARITY CUP",
+   "style": "singularity anthem",
+   "bpm": 178,
+   "loopFrames": 2071011,
+   "stems": {
+    "drums": "t5_0/drums.ogg",
+    "bass": "t5_0/bass.ogg",
+    "harm": "t5_0/harm.ogg",
+    "lead": "t5_0/lead.ogg",
+    "top": "t5_0/top.ogg"
+   },
+   "kick": [
+    [
+     0,
+     2,
+     10,
+     11
+    ],
+    [
+     0,
+     2,
+     10
+    ]
+   ],
+   "finalRate": 1.02247,
+   "states": {
+    "grid": {
+     "gains": {
+      "drums": 0,
+      "bass": 0.55,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     },
+     "lowpass": 1400
+    },
+    "cruise": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     }
+    },
+    "race": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 0
+     }
+    },
+    "intense": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    },
+    "final": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    }
+   }
+  },
+  "t5_1": {
+   "title": "Kernel Panic",
+   "cup": "SINGULARITY CUP",
+   "style": "singularity anthem",
+   "bpm": 178,
+   "loopFrames": 2071011,
+   "stems": {
+    "drums": "t5_1/drums.ogg",
+    "bass": "t5_1/bass.ogg",
+    "harm": "t5_1/harm.ogg",
+    "lead": "t5_1/lead.ogg",
+    "top": "t5_1/top.ogg"
+   },
+   "kick": [
+    [
+     0,
+     2,
+     10,
+     11
+    ],
+    [
+     0,
+     2,
+     10
+    ]
+   ],
+   "finalRate": 1.02247,
+   "states": {
+    "grid": {
+     "gains": {
+      "drums": 0,
+      "bass": 0.55,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     },
+     "lowpass": 1400
+    },
+    "cruise": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     }
+    },
+    "race": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 0
+     }
+    },
+    "intense": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    },
+    "final": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    }
+   }
+  },
+  "t5_2": {
+   "title": "Event Horizon",
+   "cup": "SINGULARITY CUP",
+   "style": "singularity anthem",
+   "bpm": 178,
+   "loopFrames": 2071011,
+   "stems": {
+    "drums": "t5_2/drums.ogg",
+    "bass": "t5_2/bass.ogg",
+    "harm": "t5_2/harm.ogg",
+    "lead": "t5_2/lead.ogg",
+    "top": "t5_2/top.ogg"
+   },
+   "kick": [
+    [
+     0,
+     2,
+     10,
+     11
+    ],
+    [
+     0,
+     2,
+     10
+    ]
+   ],
+   "finalRate": 1.02247,
+   "states": {
+    "grid": {
+     "gains": {
+      "drums": 0,
+      "bass": 0.55,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     },
+     "lowpass": 1400
+    },
+    "cruise": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 0,
+      "top": 0
+     }
+    },
+    "race": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 0
+     }
+    },
+    "intense": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    },
+    "final": {
+     "gains": {
+      "drums": 1,
+      "bass": 1,
+      "harm": 1,
+      "lead": 1,
+      "top": 1
+     }
+    }
+   }
+  }
+ }
+}

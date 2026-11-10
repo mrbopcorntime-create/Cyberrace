@@ -1,0 +1,17 @@
+X:1
+T:Gradient Descent
+C:Cyber Race OST (liquid neural)
+N:Key Cdor (dorian); written in K:C with explicit accidentals
+M:4/4
+L:1/16
+Q:1/4=174
+K:C
+%%MIDI program 81
+"Cm"g2a2^a4z2c'2^a4 | g3^a3g6z2=a2 | "Gm"^a2c'2d'4z2^d'2=d'4 | ^a3d'3^a6z2c'2 |
+"Am"c'2d'2^d'4z2^d'2c'4 | a3c'3a6z2^a2 | "F"c'4^d'2^d'2^d'8 | ^d'2^d'2=d'2^a2f'8 |
+"Cm"g2a2^a4z2c'2^a4 | g3^a3g6z2=a2 | "Gm"^a2c'2d'4z2^d'2=d'4 | ^a3d'3^a6z2c'2 |
+"Am"c''2d''2^d''4z2^d''2c''4 | a'3c''3a'6z2^a'2 | "F"c''4^d''2^d''2^d''8 | ^d''2^d''2=d''2^a'2f''8 |
+"Cm"g4g4^d8 | c4c4c8 | "Am"c4c4c8 | c4c4c8 |
+"F"c4c4c8 | c4c4c8 | "Gm"d8c6d2 | c12g4 |
+"Cm"g4g4^d8 | c4c4c8 | "Am"c4c4c8 | c4c4c8 |
+"F"c4c4c8 | c4c4c8 | "Gm"d8c6d2 | c12g4 |
