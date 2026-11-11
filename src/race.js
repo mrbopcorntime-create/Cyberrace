@@ -14,8 +14,10 @@ import { Racer, DRIFT_COLORS } from './racer.js';
 import { AIDriver } from './ai.js';
 import { ItemSystem } from './items.js';
 import { Particles } from './models.js';
+import { tokenGeometry } from './track.js';
 import { clamp, damp, wrap, lerp } from './util.js';
 
+const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _sc = new THREE.Vector3();
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _f = { pos: new THREE.Vector3(), t: new THREE.Vector3(), r: new THREE.Vector3(), u: new THREE.Vector3(), k: 0 };
 
 export class Race {
@@ -56,6 +58,10 @@ export class Race {
       recv.receiveShadow = true; this.scene.add(recv);
     }
     this.items = new ItemSystem(this);
+    // loose tokens spilled by damaged racers (pooled instanced mesh)
+    this.loose = [];
+    this.looseMesh = new THREE.InstancedMesh(tokenGeometry(), new THREE.MeshStandardMaterial({ color: 0xffc83d, emissive: new THREE.Color(0xffb020), emissiveIntensity: 1.1, roughness: 0.25, metalness: 0.9 }), 64);
+    this.looseMesh.count = 0; this.looseMesh.frustumCulled = false; this.scene.add(this.looseMesh);
 
     // roster
     this.racers = [];
@@ -103,13 +109,45 @@ export class Race {
 
   // ─── event hooks (player stats + feed) ─────────────────────────────────────
   onDriftBoost(r, lv) { if (r.isPlayer) { this.st.driftBoosts++; this.st['drift' + lv]++; this.st.bits += lv * 10; } }
-  onLand(r, airT, perfect) {
+  onLand(r, airT, stunt) {
     if (r.isPlayer) this.game.audio.play('land', { vol: Math.min(1.2, 0.5 + airT) }); else if (r.worldPos.distanceTo(this.camera.position) < 60) this.game.audio.play('land', { pos: r.worldPos, vol: 0.7 });
     if (!r.isPlayer) return;
     this.st.air += airT;
     if (airT >= 1.5) this.flag('air2');
-    if (perfect) { this.st.lands++; this.st.bits += 15; this.fx.text('PERFECT LANDING', '#7affff'); }
+    if (stunt) { this.st.lands++; this.st.bits += 15; this.fx.text('STUNT BOOST!', '#7affff'); }
     this.game.haptic(20, 120);
+  }
+  onToken(r) {
+    if (!r.isPlayer) return;
+    this.st.tokens++; this.game.audio.play('token', { rate: 0.94 + r.tokens * 0.025 });
+    if (r.tokens >= 10) this.flag('tokens10');
+  }
+  onSpinBoost(r) {
+    if (r.isPlayer) { this.st.spinBoosts++; this.st.bits += 10; this.fx.text('SPIN BOOST', '#ff6df4'); this.game.audio.play('spinboost'); this.game.haptic(30, 150); }
+    else if (r.worldPos.distanceTo(this.camera.position) < 50) this.game.audio.play('spinboost', { pos: r.worldPos, vol: 0.7 });
+  }
+  // spill n tokens from a racer: they scatter and can be picked up by anyone for a few seconds
+  spillTokens(r, n) {
+    for (let k = 0; k < n; k++) {
+      if (this.loose.length >= 64) this.loose.shift();
+      this.loose.push({ dist: r.dist - 1, x: r.x, h: 1.2 + r.h, v: r.speed * 0.6, vx: (Math.random() - 0.5) * 14, vy: 6 + Math.random() * 4, life: 6, arm: 0.5, by: r });
+    }
+  }
+  collectLoose(r) {
+    for (const t of this.loose) {
+      if (t.life <= 0 || t.arm > 0 || r.tokens >= 10) continue;
+      if (Math.abs(this.wrapDiff(r.dist, t.dist)) < 1.8 && Math.abs(r.x - t.x) < 1.8 && Math.abs(r.h - t.h) < 2.5) { t.life = 0; r.addToken(); }
+    }
+  }
+  _updateLoose(dt) {
+    for (const t of this.loose) {
+      if (t.life <= 0) continue;
+      t.life -= dt; t.arm -= dt;
+      t.dist += t.v * dt; t.v *= Math.exp(-2.5 * dt);
+      t.x = clamp(t.x + t.vx * dt, -HALF_W + 1, HALF_W - 1); t.vx *= Math.exp(-3 * dt);
+      t.vy -= 26 * dt; t.h = Math.max(1.0, t.h + t.vy * dt); if (t.h <= 1.0) { t.vy = 0; }
+    }
+    this.loose = this.loose.filter(t => t.life > 0);
   }
   onPad(r) { if (r.isPlayer) { this.st.pads++; this.game.audio.play('pad'); } }
   onSlip(r) { if (r.isPlayer) { this.game.audio.play('slip'); this.st.slips++; this.st.bits += 10; this.fx.text('SLIPSTREAM', '#bfe8ff'); } }
@@ -169,8 +207,10 @@ export class Race {
         this.started = true;
         const pa = this.rocket.pressedAt;
         if (pa !== null && !game.settings.autoAccel) {
-          if (pa >= -0.65 && pa <= -0.05) { pl.boost(1.2, 1.3); this.st.rockets++; this.st.bits += 50; this.fx.text('ROCKET START!', '#ffb340'); game.haptic(60, 200); }
-          else if (pa < -1.6) { pl.stallT = 0.9; this.fx.text('ENGINE STALL', '#ff5060'); }
+          // hold the throttle as "1" fades: perfect window ≈ 0.45–0.12 s before GO; revving before "2" ends stalls
+          if (pa >= -0.45 && pa <= -0.12) { pl.boost(1.6, 1.32); this.st.rockets++; this.st.bits += 60; this.fx.text('PERFECT LAUNCH!', '#ffd84d'); game.haptic(70, 220); }
+          else if (pa >= -0.8 && pa <= -0.04) { pl.boost(0.9, 1.24); this.st.rockets++; this.st.bits += 30; this.fx.text('ROCKET START', '#ffb340'); game.haptic(50, 180); }
+          else if (pa < -1.4) { pl.stallT = 1.0; this.fx.text('ENGINE STALL', '#ff5060'); this.game.audio.play('derez', { vol: 0.6 }); }
         }
         for (const a of this.ai) if (Math.random() < a.skill * 0.6) a.r.boost(1.0, 1.25);
         this.raceStart = performance.now();
@@ -184,6 +224,7 @@ export class Race {
     for (const r of this.racers) r.step(dt);
     this.collide();
     this.items.update(dt);
+    this._updateLoose(dt);
     this.track.update(dt);
     if (this.barrageT > 0) this.barrageT -= dt;
     // laps & places
@@ -275,6 +316,14 @@ export class Race {
       if (ox <= 0) continue;
       const s = Math.sign(dx) || 1;
       const ma = a.mass, mb = b.mass, tot = ma + mb;
+      if (a.ag > 0.5 && b.ag > 0.5) {
+        // anti-grav: collisions are inverted — both racers spin and get fired forward
+        a.x -= s * ox * 0.5; b.x += s * ox * 0.5;
+        a.vx -= s * 4; b.vx += s * 4;
+        const fired = a.spinBoost(-s) | b.spinBoost(s);
+        if (fired && (a.isPlayer || b.isPlayer || a.worldPos.distanceTo(this.camera.position) < 60)) this.fx.sparks(_v.addVectors(a.worldPos, b.worldPos).multiplyScalar(0.5), 0xff6df4, 18);
+        continue;
+      }
       if (Math.abs(ds) < 1.6) {
         a.x -= s * ox * (mb / tot); b.x += s * ox * (ma / tot);
         a.vx -= s * 2.5 * (mb / tot); b.vx += s * 2.5 * (ma / tot);
@@ -305,6 +354,17 @@ export class Race {
     if (this.sun) { this.sun.position.copy(pl.worldPos).addScaledVector(this.sunDir, 90); this.sun.target.position.copy(pl.worldPos); this.sun.target.updateMatrixWorld(); }
     for (const r of this.racers) r.render(dt);
     this.items.render(dt);
+    {
+      const m = this.looseMesh; let n = 0;
+      for (const t of this.loose) {
+        if (n >= 64) break;
+        this.track.frame(t.dist, _f);
+        _v.copy(_f.pos).addScaledVector(_f.r, t.x).addScaledVector(_f.u, t.h);
+        _m4.compose(_v, _q.setFromAxisAngle(_f.u, this.time * 5 + n), _sc.setScalar(t.life < 1.5 ? (Math.floor(t.life * 10) % 2 ? 1 : 0.4) : 1));
+        m.setMatrixAt(n++, _m4);
+      }
+      m.count = n; m.instanceMatrix.needsUpdate = true;
+    }
     this.continuousFx(dt);
     this.particles.update(dt);
     this.updateCamera(dt, aspect);
@@ -324,11 +384,15 @@ export class Race {
         _f.r.crossVectors(r.worldFwd, r.worldUp);
         for (let pm = 0; pm < this.pMul; pm++) for (const side of [-1, 1]) {
           _v2.copy(back).addScaledVector(_f.r, side * 0.9).addScaledVector(r.worldUp, 0.2);
-          P.emit(_v2, new THREE.Vector3((Math.random() - 0.5) * 6, Math.random() * 4, (Math.random() - 0.5) * 6).addScaledVector(r.worldFwd, -3), col, r.drift.level ? 0.7 : 0.35, 0.3, 12);
+          // uncharged drift: faint dust; charged: tier-coloured sparks that grow with the tier
+          if (!r.drift.level && (pm || Math.random() < 0.5)) continue;
+          P.emit(_v2, new THREE.Vector3((Math.random() - 0.5) * 6, Math.random() * 4, (Math.random() - 0.5) * 6).addScaledVector(r.worldFwd, -3), r.drift.level ? col : 0x4a5568, r.drift.level ? 0.45 + 0.12 * r.drift.level : 0.3, 0.3, 12);
         }
       }
       if (r.boostT > 0) {
-        for (let k = 0; k < 2 * this.pMul; k++) P.emit(_v2.copy(back).addScaledVector(r.worldUp, 0.6), new THREE.Vector3((Math.random() - 0.5) * 3, Math.random() * 2, (Math.random() - 0.5) * 3).addScaledVector(r.worldFwd, -12), Math.random() < 0.5 ? 0xff8a1a : 0xffe08a, 1.1, 0.35);
+        // boost flame: kept below the bloom threshold's sweet spot so it doesn't white-out the chase view
+        const near = r.isPlayer ? 0.55 : 1;
+        for (let k = 0; k < 2 * this.pMul; k++) P.emit(_v2.copy(back).addScaledVector(r.worldUp, 0.6), new THREE.Vector3((Math.random() - 0.5) * 3, Math.random() * 2, (Math.random() - 0.5) * 3).addScaledVector(r.worldFwd, -12), Math.random() < 0.6 ? 0xc85a10 : 0xb08040, 0.8 * near, 0.28);
       }
       if (r.empT > 0 && Math.random() < 0.7) P.emit(_v2.copy(r.worldPos).add(new THREE.Vector3((Math.random() - 0.5) * 3, Math.random() * 2.5, (Math.random() - 0.5) * 3)), new THREE.Vector3(0, 2, 0), 0xb98bff, 0.8, 0.2);
       if (r.slipT > 0.2 && r.isPlayer && Math.random() < 0.5) P.emit(_v2.copy(r.worldPos).add(new THREE.Vector3((Math.random() - 0.5) * 5, Math.random() * 3, (Math.random() - 0.5) * 5)).addScaledVector(r.worldFwd, 4), _v.copy(r.worldFwd).multiplyScalar(-30), 0xcfeaff, 0.25, 0.3);
@@ -380,6 +444,7 @@ export class Race {
   }
 
   dispose() {
+    this.scene.remove(this.looseMesh); this.looseMesh.dispose();
     this.items.dispose();
     for (const r of this.racers) r.dispose();
     this.particles.dispose(this.scene);
@@ -391,7 +456,7 @@ export class Race {
 function kindName(k) { return { plasma: 'PLASMA', trap: 'TRAP', emp: 'EMP', melee: 'MELEE', comet: 'COMET' }[k] || k.toUpperCase(); }
 function aiUpgrades(clock) { const l = clock; return { engine: [0, 0, 2][l], turbo: l, grip: l, armor: l, capacitor: l }; }
 export function newRaceStats() {
-  return { driftBoosts: 0, drift1: 0, drift2: 0, drift3: 0, slips: 0, pads: 0, air: 0, lands: 0, plasmaHits: 0, trapHits: 0, empHits: 0, blocks: 0, surges: 0, fusions: 0, fuseMask: 0, meleeHits: 0, knockoffs: 0, evades: 0, distance: 0, rockets: 0, itemsUsed: 0, bits: 0 };
+  return { driftBoosts: 0, drift1: 0, drift2: 0, drift3: 0, slips: 0, pads: 0, air: 0, lands: 0, plasmaHits: 0, trapHits: 0, empHits: 0, blocks: 0, surges: 0, fusions: 0, fuseMask: 0, meleeHits: 0, knockoffs: 0, evades: 0, distance: 0, rockets: 0, itemsUsed: 0, bits: 0, tokens: 0, spinBoosts: 0 };
 }
 
 // ─── effects / feedback ────────────────────────────────────────────────────
@@ -430,6 +495,8 @@ function makeFx(race) {
       if (r.isPlayer) { A.play('wall', { vol: clamp(impact / 30, 0.2, 1), pan: side * 0.6 }); game.haptic(20 + Math.min(60, impact * 2), 160); if (impact > 15) race.shake = 0.35; }
     },
     launch(r) { if (r.isPlayer || near(r)) at('jump', r); },
+    hop(r) { if (r.isPlayer) { A.play('hop'); game.haptic(10, 80); } },
+    trick(r) { if (r.isPlayer || near(r)) at('trick', r); if (r.isPlayer) { game.hud.pop('STUNT!', '#7affff'); game.haptic(25, 140); } P.burst(r.worldPos, 0x7affff, 20, 8, 0.7, 0.4); },
     capsule(r, c) { if (near(r)) P.burst(r.worldPos, race.cup.pal.a, 24, 9, 0.7, 0.5); },
     fire(r, kind) { if (near(r)) at(kind === 'plasma' ? 'plasma_fire' : kind === 'emp' ? 'zap' : 'trap_lay', r); },
     shieldUp(r) { if (r.isPlayer || near(r)) at('shield_up', r); },

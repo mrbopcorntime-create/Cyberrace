@@ -5,6 +5,18 @@ import { clamp, damp, wrap } from './util.js';
 import { buildVehicle, buildShield, Trail } from './models.js';
 
 export const GRAV = 26;
+let _tunnelTex;
+function windTunnel() {
+  if (!_tunnelTex) {
+    const c = document.createElement('canvas'); c.width = 64; c.height = 256; const g = c.getContext('2d');
+    for (let i = 0; i < 70; i++) { const x = Math.random() * 64, y = Math.random() * 256, l = 40 + Math.random() * 110, wd = 1.5 + Math.random() * 2.5; const gr = g.createLinearGradient(0, y, 0, y + l); gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.5, 'rgba(230,248,255,1)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(x, y, wd, l); g.fillRect(x, y - 256, wd, l); }
+    _tunnelTex = new THREE.CanvasTexture(c); _tunnelTex.wrapS = _tunnelTex.wrapT = THREE.RepeatWrapping;
+  }
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(2.3, 1.5, 7, 24, 1, true).rotateX(Math.PI / 2).translate(0, 1.0, 1.2),
+    new THREE.MeshBasicMaterial({ map: _tunnelTex, color: new THREE.Color(0xbfe6ff).multiplyScalar(1.6), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+  m.visible = false; m.renderOrder = 5;
+  return m;
+}
 let _blob;
 function blobTex() {
   if (_blob) return _blob;
@@ -13,9 +25,14 @@ function blobTex() {
   g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
   _blob = new THREE.CanvasTexture(c); return _blob;
 }
-const DRIFT_LV = [0.85, 1.75, 2.7];
-const DRIFT_BOOST = [0, 0.5, 0.9, 1.35];
-export const DRIFT_COLORS = [0xffffff, 0x3fd8ff, 0xc060ff, 0xff8a1a];
+// drift charge thresholds (charge-seconds) and release boosts per tier: blue → orange → purple
+export const DRIFT_LV = [0.65, 1.4, 2.35];
+const DRIFT_BOOST = [0, 0.45, 1.0, 1.75];
+const DRIFT_POW = [1, 1.16, 1.24, 1.32];
+export const DRIFT_COLORS = [0xffffff, 0x2fa8ff, 0xff8a1a, 0xd040ff];
+export const MAX_TOKENS = 10, TOKEN_BONUS = 0.008;   // +0.8 % top speed per token, +8 % at 10
+const HOP_VY = 3.7;                                  // ~0.28 s hop
+const SLIP_CHARGE = 2.0;
 
 const _f = { pos: new THREE.Vector3(), t: new THREE.Vector3(), r: new THREE.Vector3(), u: new THREE.Vector3(), k: 0 };
 const _fwd = new THREE.Vector3(), _left = new THREE.Vector3(), _m = new THREE.Matrix4(), _v = new THREE.Vector3(), _q = new THREE.Quaternion();
@@ -55,7 +72,9 @@ export class Racer {
     this.shield = null; this.phaseT = 0; this.cometT = 0; this.shockT = 0; this.shockHit = new Set(); this.staticT = 0; this.burnT = 0; this.burnDrop = 0;
     this.orbital = null; this.scrambleT = 0;
     this.drift = { on: false, dir: 0, t: 0, level: 0 };
-    this.landArm = false;
+    this.hopping = false; this.hopDir = 0; this.hopGrace = 0;
+    this.trickQ = -9; this.tricking = false; this.trickAnim = 0; this.launchT = -9; this.launchKind = null;
+    this.tokens = 0; this.ag = 0; this.spinBoostT = 0; this.spinBoostDir = 1;
     this.items = [null, null]; this.rouletteT = 0;
     this.lastStrip = null; this.lastHitBy = null; this.lastHitT = -99;
     this.lap = 0; this.lapTimes = []; this.lapStart = 0; this.bestLap = Infinity;
@@ -69,6 +88,7 @@ export class Racer {
     this.model = v; this.root = v.root; this.neonColor = new THREE.Color(neon);
     race.scene.add(this.root);
     this.shieldMesh = buildShield(0x4dfff3); this.shieldMesh.visible = false; this.root.add(this.shieldMesh);
+    if (this.isPlayer) { this.tunnel = windTunnel(); this.root.add(this.tunnel); }
     if (!race.game.renderer.shadowMap.enabled) {
       this.blob = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 4.4).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: blobTex(), transparent: true, depthWrite: false, opacity: 0.6, polygonOffset: true, polygonOffsetFactor: -2 }));
       this.blob.renderOrder = -1; this.root.add(this.blob);
@@ -103,6 +123,7 @@ export class Racer {
     }
     if (kind === 'emp') { this.emp(opts.dur || 1.4, by); return true; }
     const dur = (opts.dur || 1.15) * this.recover;
+    this.dropTokens(kind === 'melee' ? 1 : 3);
     this.spinT = Math.max(this.spinT, dur);
     this.drift.on = false; this.drift.t = 0; this.drift.level = 0;
     this.speed *= opts.keep || 0.55;
@@ -116,6 +137,7 @@ export class Racer {
     if (this.phaseT > 0 || this.invulnT > 0) return false;
     if (this.shield) { this.shield.hits--; this.race.fx.block(this, by); if (this.shield.hits <= 0) this.shield = null; return false; }
     this.empT = Math.max(this.empT, dur * (1 - (this.mods.empResist || 0)));
+    this.dropTokens(2);
     this.drift.on = false; this.drift.t = 0;
     this.lastHitBy = by; this.lastHitT = this.race.time;
     this.rs.hitsTaken++;
@@ -125,6 +147,7 @@ export class Racer {
 
   startFall(cause) {
     if (this.state === 'fall') return;
+    this.dropTokens(3, true);
     this.state = 'fall'; this.fallT = 1.25; this.fallCause = cause; this.falls = (this.falls || 0) + 1;
     this.drift.on = false; this.boostT = 0;
     if (this.vy > 0) this.vy *= 0.3;
@@ -142,8 +165,48 @@ export class Racer {
     } else this.dist -= 4;
     this.state = 'race'; this.x = clamp(this.x * 0.2, -4, 4); this.psi = 0; this.vx = 0; this.h = 0; this.vy = 0; this.air = false;
     this.speed = this.top * 0.45; this.invulnT = 2.0; this.spinT = 0; this.empT = 0;
+    this.hopping = false; this.tricking = false; this.trickAnim = 0;
     this.trails.forEach(t => t.reset());
     this.race.fx.respawn(this);
+  }
+
+  beginDrift(dir) {
+    const d = this.drift;
+    d.on = true; d.dir = dir; d.t = 0; d.level = 0; this.squash = 0.6; this.hopGrace = 0;
+    this.race.fx.driftStart(this);
+  }
+  launch(kind) {
+    this.air = true; this.hopping = false; this.airT = 0;
+    this.launchT = this.race.time; this.launchKind = kind;
+    if (this.race.time - this.trickQ < 0.32) this.startTrick();     // pressed just before the lip
+    this.trickQ = -9;
+    this.race.fx.launch(this);
+  }
+  startTrick() {
+    if (this.tricking) return;
+    this.tricking = true; this.trickAnim = 0;
+    this.trickStyle = this.clsId === 'bike' ? 'flip' : (Math.random() < 0.5 ? 'roll' : 'spin');
+    this.race.fx.trick(this);
+  }
+
+  dropTokens(n, lost = false) {
+    n = Math.min(n, this.tokens);
+    if (n <= 0) return;
+    this.tokens -= n;
+    if (!lost) this.race.spillTokens(this, n);
+    if (this.isPlayer) this.race.fx.text(`-${n} TOKEN${n > 1 ? 'S' : ''}`, '#ffb020');
+  }
+  addToken() {
+    if (this.tokens < MAX_TOKENS) { this.tokens++; this.race.onToken(this); return true; }
+    return false;
+  }
+  // anti-grav contact: spin in place and get fired forward instead of losing speed
+  spinBoost(dir) {
+    if (this.spinBoostT > 0.15 || this.state !== 'race') return false;
+    this.spinBoostT = 0.5; this.spinBoostDir = dir || 1;
+    this.boost(0.6, 1.2);
+    this.race.onSpinBoost(this);
+    return true;
   }
 
   meleeStrike() {
@@ -208,6 +271,9 @@ export class Racer {
     this.stallT = Math.max(0, this.stallT - dt);
     this.wobble = Math.max(0, this.wobble - dt);
     this.squash = Math.max(0, this.squash - dt * 3);
+    this.spinBoostT = Math.max(0, this.spinBoostT - dt);
+    this.hopGrace = Math.max(0, this.hopGrace - dt);
+    if (this.tricking) this.trickAnim = Math.min(1, this.trickAnim + dt / 0.42);
     if (this.shockT > 0) { this.shockT -= dt; if (this.shockT <= 0) this.shockHit.clear(); }
     if (this.shield) { this.shield.t -= dt; if (this.shield.t <= 0) this.shield = null; }
     if (this.orbital) { this.orbital.t -= dt; if (this.orbital.t <= 0) { race.items.orbitalRelease(this); this.orbital = null; } }
@@ -228,7 +294,8 @@ export class Racer {
     else this.spinAng = damp(this.spinAng, Math.round(this.spinAng / (Math.PI * 2)) * Math.PI * 2, 8, dt);
 
     // effective top speed
-    let top = this.top * (race.rubber ? race.rubber(this) : 1);
+    let top = this.top * (1 + TOKEN_BONUS * this.tokens) * (race.rubber ? race.rubber(this) : 1);
+    this.effTop = top;
     if (this.empT > 0) top *= 0.58;
     const boosting = this.boostT > 0;
     if (boosting) this.boostT -= dt;
@@ -249,7 +316,7 @@ export class Racer {
         if (this.speed > target) this.speed = target;
       } else this.speed = damp(this.speed, target, 1.8, dt);
     } else this.speed = damp(this.speed, 0, 0.55, dt);
-    if (this.air) this.speed = damp(this.speed, this.speed * 0.97, 0.3, dt);
+    if (this.air && !this.hopping) this.speed = damp(this.speed, this.speed * 0.97, 0.3, dt);
 
     // steering
     let steer = ctrl ? inp.steer : 0;
@@ -257,22 +324,36 @@ export class Racer {
     if (this.scrambleT > 0 && !this.isPlayer) steer += Math.sin(race.time * 9 + this.idx * 2) * 0.5;
     steer = clamp(steer, -1, 1);
 
-    // drift begin / maintain / release
+    // ─── hop → drift ──────────────────────────────────────────────────────
+    // The drift button hops. Steering at take-off (or while airborne) makes the
+    // vehicle land sideways in a drift; with no steer it is just a hop.
+    // Near a ramp lip / crest the press is held as a stunt input instead.
     const d = this.drift;
-    if (ctrl && inp.drift && !d.on && !this.air && Math.abs(steer) > 0.25 && this.speed > 20) {
-      d.on = true; d.dir = Math.sign(steer); d.t = 0; d.level = 0; this.squash = 0.6;
-      race.fx.driftStart(this);
+    if (ctrl && inp.driftPressed) {
+      const la = !this.air && tr.launchAhead(this.s, Math.max(2.5, this.speed * 0.2));
+      if (la) this.trickQ = race.time;                                         // stunt queued for the launch
+      else if (this.air && !this.hopping && race.time - this.launchT < 0.16) this.startTrick();
+      else if (!this.air && !d.on) {
+        this.air = true; this.hopping = true; this.airT = 0; this.vy = HOP_VY; this.squash = 0.4;
+        this.hopDir = Math.abs(steer) > 0.25 ? Math.sign(steer) : 0;
+        race.fx.hop(this);
+      }
     }
+    if (this.hopping && Math.abs(steer) > 0.35) this.hopDir = Math.sign(steer);   // buffered steer during the hop
+    // short grace after a hop: holding drift and turning still kicks it into a slide
+    if (ctrl && !d.on && !this.air && inp.drift && this.hopGrace > 0 && Math.abs(steer) > 0.35) this.beginDrift(Math.sign(steer));
     if (d.on) {
       if (!inp.drift || this.speed < 13 || !ctrl) {
         if (d.level > 0 && ctrl) {
-          this.boost(DRIFT_BOOST[d.level], 1.17 + 0.04 * d.level);
+          this.boost(DRIFT_BOOST[d.level], DRIFT_POW[d.level]);
           this.rs.driftBoosts++;
           race.onDriftBoost(this, d.level);
         }
         d.on = false; d.t = 0; d.level = 0;
       } else {
-        d.t += dt * this.driftRate * (0.55 + 0.45 * Math.abs(steer)) * (this.air ? 0.3 : 1);
+        // charge: duration × sharpness (steering into the turn charges fastest, counter-steer slowest)
+        const sharp = (clamp(steer * d.dir, -1, 1) + 1) / 2;
+        d.t += dt * this.driftRate * (0.35 + 0.65 * sharp) * (this.air ? 0.3 : 1);
         const lv = d.t >= DRIFT_LV[2] ? 3 : d.t >= DRIFT_LV[1] ? 2 : d.t >= DRIFT_LV[0] ? 1 : 0;
         if (lv > d.level) { d.level = lv; race.fx.driftLevel(this, lv); }
       }
@@ -280,9 +361,10 @@ export class Racer {
 
     const spdF = clamp(Math.abs(this.speed) / 16, 0, 1);
     let w;
-    if (d.on) w = d.dir * this.grip * this.driftTurn * (0.6 + 0.48 * clamp(steer * d.dir, -1, 1)) * 0.62;
+    // drift arc: steer in = tight (×1.15), neutral = ×0.6, full counter-steer = almost straight (×0.05)
+    if (d.on) w = d.dir * this.grip * this.driftTurn * (0.6 + 0.55 * clamp(steer * d.dir, -1, 1)) * 0.62;
     else w = steer * this.grip * spdF * (1 - 0.32 * clamp(this.speed / top, 0, 1)) * 0.6 * Math.sign(this.speed || 1);
-    if (this.air) { w *= 0.35; this.psi *= Math.exp(-2.2 * dt); }
+    if (this.air && !this.hopping) { w *= 0.35; this.psi *= Math.exp(-2.2 * dt); }
 
     const k = tr.frame(this.dist, _f).k;
     const denom = Math.max(0.55, 1 - k * this.x);
@@ -321,28 +403,46 @@ export class Racer {
       }
     }
 
-    // vertical / jumps
+    // ─── vertical: ramps, crests, hops, stunts ─────────────────────────────
     const surf = tr.surface(this.s);
     if (!this.air) {
+      const crest = this.speed > 30 && tr.crestAt(this.s, Math.max(0.6, this.speed * dt * 1.5));
       if (surf.gap && this.phaseT <= 0) { this.air = true; this.airT = 0; this.vy = 0; }
       else if (surf.ramp && surf.rampEnd && this.speed > 8) {
         const j = surf.ramp;
         this.vy = (j.mega ? 7 : 4) + Math.min(this.speed, 85) * (j.mega ? 0.135 : 0.1) * this.padBoost;
-        this.air = true; this.airT = 0; this.landArm = false;
         this.h = surf.h;
-        race.fx.launch(this);
+        this.launch('ramp');
+      } else if (crest && this.lastCrest !== crest) {
+        this.lastCrest = crest;
+        this.vy = Math.max(2.6, Math.min(this.speed, 80) * crest.drop * 1.5);
+        this.launch('crest');
       } else this.h = surf.h;
     }
+    if (this.lastCrest && Math.abs(race.wrapDiff(this.dist, this.lastCrest.s)) > 30) this.lastCrest = null;
     if (this.air) {
+      // a hop that carries over a ramp lip still launches off it
+      if (this.hopping && surf.ramp && surf.rampEnd && this.speed > 8) {
+        const j = surf.ramp;
+        this.vy = Math.max(this.vy, (j.mega ? 7 : 4) + Math.min(this.speed, 85) * (j.mega ? 0.135 : 0.1) * this.padBoost);
+        this.h = Math.max(this.h, surf.h);
+        this.launch('ramp');
+      }
       this.vy -= GRAV * dt; this.h += this.vy * dt; this.airT += dt;
-      if (inp.driftPressed) this.landArm = true;
       if (this.h <= surf.h) {
         if (surf.gap && this.phaseT <= 0) { if (this.h < -2.5) { this.startFall('gap'); return; } }
         else {
-          this.h = surf.h; this.air = false; this.squash = 1;
-          race.onLand(this, this.airT, this.landArm);
-          if (this.landArm) this.boost(0.75, 1 + 0.24 * this.padBoost);
-          this.landArm = false; this.vy = 0;
+          this.h = surf.h; this.air = false; this.vy = 0;
+          if (this.hopping) {
+            this.hopping = false; this.squash = 0.5; this.hopGrace = 0.2;
+            if (ctrl && inp.drift && this.hopDir && this.speed > 18 && !d.on) this.beginDrift(this.hopDir);
+          } else {
+            this.squash = 1;
+            const stunt = this.tricking;
+            race.onLand(this, this.airT, stunt);
+            if (stunt) this.boost(0.55 + Math.min(0.55, this.airT * 0.45), 1.24 * this.padBoost);
+          }
+          this.tricking = false; this.trickAnim = 0;
         }
       }
     }
@@ -366,19 +466,45 @@ export class Racer {
       }
     }
 
-    // slipstream
+    // tokens on the track and loose spilled tokens
+    if (this.tokens < MAX_TOKENS && this.h < 3) {
+      for (const tk of tr.tokens) {
+        if (!tk.active) continue;
+        const ds = race.wrapDiff(this.dist, tk.s);
+        if (Math.abs(ds) < 1.6 && Math.abs(this.x - tk.x) < 1.6) { tk.active = false; tk.timer = 12; this.addToken(); }
+      }
+      race.collectLoose(this);
+    }
+
+    // anti-grav: magnetic hover; bumpers give a spin boost instead of a crash
+    this.ag = tr.agAt(this.s);
+    if (this.ag > 0.5) for (const a of tr.ags) {
+      if (this.s < a.s0 || this.s > a.s1) continue;
+      for (const bmp of a.bumpers) {
+        const ds = race.wrapDiff(this.dist, bmp.s), dx = this.x - bmp.x;
+        if (Math.abs(ds) < bmp.r + 1.1 && Math.abs(dx) < bmp.r + 1.1 && !this.air) {
+          if ((bmp.cd.get(this) || 0) > race.time) continue;
+          bmp.cd.set(this, race.time + 0.8); bmp.pulse = 1;
+          this.vx += Math.sign(dx || 1) * 7;
+          this.spinBoost(Math.sign(dx || 1));
+        }
+      }
+    }
+
+    // slipstream: hold the pocket behind a rival for ~2 s → wind tunnel → slingshot surge
+    let inDraft = false;
     if (this.speed > 28 && !this.air) {
-      let inDraft = false;
       for (const o of race.racers) {
         if (o === this || o.state !== 'race') continue;
         const ds = race.relDist(o, this);
-        if (ds > 2.5 && ds < 11 && Math.abs(o.x - this.x) < 2.4) { inDraft = true; break; }
+        if (ds > 2.5 && ds < 16 && Math.abs(o.x - this.x) < 2.6) { inDraft = true; break; }
       }
-      if (inDraft) {
-        this.slipT += dt * (this.mods.slip || 1);
-        if (this.slipT >= 1.3) { this.slipT = 0; this.boost(0.8 * (this.mods.slip ? 1.3 : 1), 1.18); race.onSlip(this); }
-      } else this.slipT = Math.max(0, this.slipT - dt * 0.7);
-    } else this.slipT = Math.max(0, this.slipT - dt);
+    }
+    if (inDraft) {
+      this.slipT += dt * (this.mods.slip || 1);
+      if (this.slipT >= SLIP_CHARGE) { this.slipT = 0; this.boost(1.15 * (this.mods.slip ? 1.3 : 1), 1.24); race.onSlip(this); }
+    } else this.slipT = Math.max(0, this.slipT - dt * 0.8);
+    this.drafting = inDraft;
 
     // controller actions
     if (ctrl) {
@@ -395,6 +521,8 @@ export class Racer {
     tr.frame(this.dist, _f);
     const p = this.worldPos.copy(_f.pos).addScaledVector(_f.r, this.x).addScaledVector(_f.u, this.h);
     let yaw = this.psi + (this.drift.on ? this.drift.dir * 0.42 : 0) + this.spinAng;
+    if (this.spinBoostT > 0) { const k = 1 - this.spinBoostT / 0.5; yaw += this.spinBoostDir * Math.PI * 2 * (k * k * (3 - 2 * k)); }
+    if (this.ag > 0) p.addScaledVector(_f.u, 0.35 * this.ag + Math.sin(race.time * 7 + this.idx) * 0.06 * this.ag);   // magnetic hover
     if (this.meleeAnim > 0) yaw += this.meleeDir * Math.sin((this.meleeAnim / 0.3) * Math.PI) * 0.45;
     _fwd.copy(_f.t).multiplyScalar(Math.cos(yaw)).addScaledVector(_f.r, Math.sin(yaw)).normalize();
     // pitch when airborne
@@ -412,6 +540,20 @@ export class Racer {
     const steer = this.inp.steer;
     const lean = this.clsId === 'bike' ? (-steer * 0.38 - (this.drift.on ? this.drift.dir * 0.32 : 0)) : (-steer * 0.06);
     body.rotation.z = damp(body.rotation.z, lean + Math.sin(race.time * 30) * this.wobble * 0.3, 8, dt);
+    body.rotation.x = 0;
+    if (this.tricking) {
+      const e = this.trickAnim, a = Math.PI * 2 * (1 - Math.pow(1 - e, 3));
+      if (this.trickStyle === 'flip') body.rotation.x = -a;
+      else if (this.trickStyle === 'roll') body.rotation.z = lean + a;
+      else body.rotation.y = a;
+    } else body.rotation.y = 0;
+    if (this.tunnel) {
+      const k = clamp(this.slipT / SLIP_CHARGE, 0, 1), on = this.drafting ? 1 : 0;
+      this.tunnel.visible = k > 0.03;
+      this.tunnel.material.opacity = (0.25 + 0.95 * k) * (0.35 + 0.65 * on);
+      this.tunnel.material.map.offset.y = (race.time * 3.2) % 1;
+      this.tunnel.scale.set(1 + k * 0.25, 1 + k * 0.25, 1 + k * 0.4);
+    }
     body.position.y = this.squash * -0.12 + (this.drift.on ? Math.abs(Math.sin(race.time * 18)) * 0.05 : 0);
     body.scale.y = 1 - this.squash * 0.08;
     for (const w of this.model.wheels) w.children[0] && (w.rotation.x += this.speed * dt * 1.9);

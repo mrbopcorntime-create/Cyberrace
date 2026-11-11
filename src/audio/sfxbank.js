@@ -223,6 +223,14 @@ const CUES = {
   crackle1: (sr, r) => { const b = S(sr, 0.09); sweepNoise(b, 0, 0.05, 1800, 900, 1.5, 0.9, r, x => Math.exp(-x * 6), false); D.kick(b, 0, { gain: 0.35, f0: 200, f1: 90, decay: 50, dur: 0.06 }); return b; },
   crackle2: (sr, r) => { const b = S(sr, 0.09); sweepNoise(b, 0, 0.035, 2600, 1200, 1.5, 0.9, r, x => Math.exp(-x * 6), false); return b; },
   crackle3: (sr, r) => { const b = S(sr, 0.12); sweepNoise(b, 0, 0.07, 1200, 600, 1.2, 0.9, r, x => Math.exp(-x * 5), false); D.kick(b, 0, { gain: 0.4, f0: 160, f1: 70, decay: 40, dur: 0.08 }); return b; },
+  // hop: short spring thump + air puff
+  hop: (sr, r) => { const b = S(sr, 0.25); tone(b, 0, 0.12, 180, 420, 'sine', 0.55, 0, 0.002); D.kick(b, 0, { gain: 0.35, f0: 160, f1: 90, decay: 30, dur: 0.1 }); sweepNoise(b, 0, 0.12, 1200, 2600, 1.5, 0.25, r, x => Math.exp(-x * 4)); return b; },
+  // stunt: rising whoosh + bright chime
+  trick: (sr, r) => { const b = S(sr, 0.7); sweepNoise(b, 0, 0.4, 600, 4200, 2, 0.45, r, x => Math.sin(Math.PI * x)); [1568, 2093, 2637].forEach((f, i) => glass(b, 0.1 + i * 0.05, f, 0.25, 9)); return b; },
+  // token: coin-like two-note chime in the cue band
+  token: (sr, r) => { const b = S(sr, 0.32); glass(b, 0, 1976, 0.35, 16); glass(b, 0.055, 2637, 0.35, 14); return b; },
+  // anti-grav spin boost: magnetic zap-whirl + forward whoosh
+  spinboost: (sr, r) => { const b = S(sr, 0.8); tone(b, 0, 0.5, 700, 2400, 'saw', 0.18, 0, 0.003); for (let i = 0; i < 6; i++) glass(b, i * 0.05, 1200 + i * 260, 0.12, 20); sweepNoise(b, 0.1, 0.5, 900, 3200, 1.4, 0.4, r, x => Math.exp(-x * 2.5)); return b; },
   pneumatic: (sr, r) => { const b = S(sr, 0.35); sweepNoise(b, 0.02, 0.25, 5000, 3000, 0.7, 0.4, r, x => Math.exp(-x * 4)); metal(b, 0, [310, 520, 870], 30, 0.4, r); return b; },
 };
 

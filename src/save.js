@@ -8,7 +8,7 @@ function defaultVehicle() { return { paint: 'carbon', neon: 'char', trail: 'std'
 export function defaultProfile() {
   return {
     v: 1, bits: 500,
-    stats: { races: 0, wins: 0, podiums: 0, rockets: 0, ttRecords: 0, ttTracks: 0, distance: 0, driftBoosts: 0, drift1: 0, drift2: 0, drift3: 0, slips: 0, pads: 0, air: 0, lands: 0, plasmaHits: 0, trapHits: 0, empHits: 0, blocks: 0, surges: 0, fusions: 0, fuseMask: 0, meleeHits: 0, knockoffs: 0, evades: 0, purchases: 0, bitsEarned: 0, winsBy: {}, winsChar: {}, golds: {} },
+    stats: { races: 0, wins: 0, podiums: 0, rockets: 0, ttRecords: 0, ttTracks: 0, distance: 0, driftBoosts: 0, drift1: 0, drift2: 0, drift3: 0, slips: 0, pads: 0, air: 0, lands: 0, plasmaHits: 0, trapHits: 0, empHits: 0, blocks: 0, surges: 0, fusions: 0, fuseMask: 0, meleeHits: 0, knockoffs: 0, evades: 0, purchases: 0, bitsEarned: 0, tokens: 0, spinBoosts: 0, winsBy: {}, winsChar: {}, golds: {} },
     flags: {}, ach: {},
     chars: [...STARTERS],
     trophies: {},           // "cup_clock" -> 1 gold, 2 silver, 3 bronze
@@ -44,7 +44,7 @@ export function upgradeSpent(v) { return Object.values(v.up).reduce((a, b) => a 
 // Merge one race's player stats into lifetime stats
 export function mergeRace(profile, race, res) {
   const s = profile.stats, st = res.st;
-  for (const k of ['driftBoosts', 'drift1', 'drift2', 'drift3', 'slips', 'pads', 'air', 'lands', 'plasmaHits', 'trapHits', 'empHits', 'blocks', 'surges', 'fusions', 'meleeHits', 'knockoffs', 'evades', 'distance', 'rockets']) s[k] = (s[k] || 0) + (st[k] || 0);
+  for (const k of ['driftBoosts', 'drift1', 'drift2', 'drift3', 'slips', 'pads', 'air', 'lands', 'plasmaHits', 'trapHits', 'empHits', 'blocks', 'surges', 'fusions', 'meleeHits', 'knockoffs', 'evades', 'distance', 'rockets', 'tokens', 'spinBoosts']) s[k] = (s[k] || 0) + (st[k] || 0);
   s.fuseMask = (s.fuseMask | 0) | st.fuseMask;
   if (res.mode !== 'tt') {
     s.races++;

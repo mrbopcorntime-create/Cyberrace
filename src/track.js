@@ -122,19 +122,28 @@ export class Track {
       for (let k = -W; k <= W; k++) s += raw[(i + k + n) % n];
       kap[i] = s / (2 * W + 1);
     }
+    this.U0 = U.map(u => u.clone());
     this.bank = new Float32Array(n);
-    for (let i = 0; i < n; i++) {
-      const b = clamp(kap[i] * 15, -0.26, 0.26);
-      this.bank[i] = b;
-      const q = new THREE.Quaternion().setFromAxisAngle(T[i], -b);
-      U[i].applyQuaternion(q).normalize();
-      R.push(new THREE.Vector3().crossVectors(T[i], U[i]).normalize());
-    }
+    for (let i = 0; i < n; i++) this.bank[i] = clamp(kap[i] * 15, -0.26, 0.26);
+    this._applyBank();
     let minY = Infinity, maxY = -Infinity;
     const box = new THREE.Box3();
     for (const p of P) { minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y); box.expandByPoint(p); }
     this.minY = minY; this.maxY = maxY; this.box = box;
     this.groundY = minY - 14;
+  }
+
+  // rebuild U/R from the unbanked frame + bank angle (re-run after anti-grav segments add steep banking)
+  _applyBank() {
+    const n = this.n, T = this.T, q = new THREE.Quaternion();
+    this.U = []; this.R = [];
+    for (let i = 0; i < n; i++) {
+      const u = this.U0[i].clone().applyQuaternion(q.setFromAxisAngle(T[i], -this.bank[i])).normalize();
+      this.U.push(u); this.R.push(new THREE.Vector3().crossVectors(T[i], u).normalize());
+    }
+    let lowEdge = Infinity;
+    for (let i = 0; i < n; i++) lowEdge = Math.min(lowEdge, this.P[i].y - Math.abs(this.R[i].y) * HALF_W);
+    if (this.minY !== undefined) this.groundY = Math.min(this.minY - 14, lowEdge - 5);
   }
 
   _badCrossing() {
@@ -210,6 +219,53 @@ export class Track {
       if (best) { this.jumps.push(best); take(best.s0 - 10, best.s0 + best.ramp + best.gap + 95); }
     }
 
+    // ─── anti-gravity wall-ride segments: steep magnetic banking on the sweepiest bends ───
+    this.agMask = new Float32Array(this.n);   // 0..1 blend (1 = fully magnetic)
+    this.ags = [];
+    const nAg = def.ag ?? (this.cup.id >= 3 ? 2 : 1), AGL = 180, RAMP = 38;
+    const nearCross = (a, b) => (this.crossings || []).some(([i, j]) => [i, j].some(k => { const sk = k * this.step; return sk > a - 70 && sk < b + 70; }));
+    for (let g = 0; g < nAg; g++) {
+      let best = -1, bestK = 0;
+      for (let tries = 0; tries < 70; tries++) {
+        const s0 = 110 + rnd() * (L - AGL - 220);
+        if (!free(s0 - 10, s0 + AGL + 10) || nearCross(s0, s0 + AGL)) continue;
+        const k = Math.abs(this.curvatureAhead(s0 + RAMP, AGL - 2 * RAMP).avg);
+        if (k > bestK) { bestK = k; best = s0; }
+      }
+      if (best < 0) continue;
+      const seg = { s0: best, s1: best + AGL, dir: Math.sign(this.curvatureAhead(best + RAMP, AGL - 2 * RAMP).avg) || 1 };
+      this.ags.push(seg); take(best - 10, best + AGL + 10);
+      for (let s = best; s <= best + AGL; s += this.step) {
+        const i = this.idx(s), e = Math.min(1, (s - best) / RAMP, (best + AGL - s) / RAMP);
+        const b = e * e * (3 - 2 * e);                                   // smoothstep in/out
+        this.agMask[i] = b;
+        this.bank[i] = this.bank[i] * (1 - b) + seg.dir * 1.15 * b;     // up to ~66° wall-ride
+      }
+      // magnetic bumpers: touching one spins you and fires you forward
+      seg.bumpers = [];
+      for (let k = 0; k < 3; k++) seg.bumpers.push({ s: best + RAMP + 18 + k * ((AGL - 2 * RAMP - 36) / 2), x: [-6.5, 6.5, 0][k] * (rnd() < 0.5 ? 1 : -1), r: 1.2, cd: new Map() });
+    }
+    if (this.ags.length) this._applyBank();
+
+    // crests: where the road falls away fast enough to launch → stunt opportunities
+    this.crests = [];
+    {
+      const n = this.n, look = Math.round(12 * SPS), grade = i => this.T[(i + n) % n].y;
+      let last = -1e9;
+      const cand = [];
+      for (let i = 0; i < n; i++) {
+        const drop = grade(i - look) - grade(i + look);
+        if (drop > 0.028 && drop >= grade(i - look - 1) - grade(i + look - 1) && drop >= grade(i - look + 1) - grade(i + look + 1)) cand.push({ s: i * this.step, drop });
+      }
+      cand.sort((a, b) => b.drop - a.drop);
+      for (const c of cand) {
+        if (this.crests.length >= 4) break;
+        if (!free(c.s - 25, c.s + 25) || this.crests.some(o => Math.abs(o.s - c.s) < 150)) continue;
+        this.crests.push({ s: c.s, drop: Math.min(0.12, c.drop) }); take(c.s - 25, c.s + 25);
+      }
+      this.crests.sort((a, b) => a.s - b.s);
+    }
+
     // open (rail-less) edges on elevated stretches
     this.openMask = new Uint8Array(this.n);
     this.opens = [];
@@ -254,6 +310,17 @@ export class Track {
       for (let c = -2; c <= 2; c++) this.capsules.push({ s, x: c * 4.2, active: true, timer: 0 });
     }
 
+    // speed tokens: lines of 5 along a lane, guaranteed through every anti-grav section
+    this.tokens = [];
+    const addLine = (s0, x, n = 5) => { for (let k = 0; k < n; k++) { const s = s0 + k * 5; if (!this.surface(s).gap) this.tokens.push({ s, x, active: true, timer: 0 }); } };
+    for (const a of this.ags) addLine(a.s0 + 60, (rnd() < 0.5 ? -1 : 1) * 4.5, 6);
+    const lines = Math.max(6, Math.round(L / 230));
+    for (let k = 0; k < lines; k++) {
+      let s = L * ((k + 0.7) / lines) + (rnd() - 0.5) * 40;
+      if (s < 100 || s > L - 100 || this.capsules.some(c => Math.abs(c.s - s) < 30) || this.jumps.some(j => s > j.s0 - 30 && s < j.s0 + j.ramp + j.gap + 10)) continue;
+      addLine(s, [-7, -3.5, 0, 3.5, 7][Math.floor(rnd() * 5)]);
+    }
+
     // hazards
     this.hazards = [];
     const hz = def.hz;
@@ -288,6 +355,16 @@ export class Track {
     return { h: 0, gap: false, ramp: null };
   }
   isOpen(s) { return this.openMask[this.idx(s)] > 0; }
+  agAt(s) { return this.agMask[this.idx(s)]; }
+  // distance to the next launch point (ramp lip or crest) within `max` metres, or null
+  launchAhead(s, max) {
+    s = wrap(s, this.L);
+    let best = null;
+    for (const j of this.jumps) { const d = wrap(j.s0 + j.ramp - s, this.L); if (d < max && (!best || d < best.d)) best = { d, kind: 'ramp' }; }
+    for (const c of this.crests) { const d = wrap(c.s - s, this.L); if (d < max && (!best || d < best.d)) best = { d, kind: 'crest', c }; }
+    return best;
+  }
+  crestAt(s, ds) { s = wrap(s, this.L); for (const c of this.crests) { const d = wrap(s - c.s, this.L); if (d < ds) return c; } return null; }
 
   // ─── meshes ───────────────────────────────────────────────────────────────
   build(scene, quality) {
@@ -698,6 +775,80 @@ export class Track {
     this.group.add(shell, rings, core, glow);
     // hazards
     for (const h of this.hazards) this._hazardMesh(h);
+    this._agMeshes();
+    this._crestMeshes();
+    this._tokenMeshes();
+  }
+
+  // road-hugging ribbon between lateral offsets [x0,x1] over [s0,s1]
+  _ribbon(s0, s1, x0, x1, lift, uvLen = 8) {
+    const pos = [], uv = [], ind = [];
+    const f = { pos: new THREE.Vector3(), t: new THREE.Vector3(), r: new THREE.Vector3(), u: new THREE.Vector3() };
+    const steps = Math.max(2, Math.ceil((s1 - s0) / 1.5));
+    for (let k = 0; k <= steps; k++) {
+      const s = s0 + (s1 - s0) * k / steps;
+      this.frame(s, f);
+      const a = f.pos.clone().addScaledVector(f.r, x0).addScaledVector(f.u, lift), b = f.pos.clone().addScaledVector(f.r, x1).addScaledVector(f.u, lift);
+      pos.push(a.x, a.y, a.z, b.x, b.y, b.z); uv.push(0, (s - s0) / uvLen, 1, (s - s0) / uvLen);
+      if (k) { const q = (k - 1) * 2; ind.push(q, q + 2, q + 1, q + 1, q + 2, q + 3); }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(ind);
+    return g;
+  }
+
+  _agMeshes() {
+    if (!this.ags.length) return;
+    // scrolling magnetic chevrons along both edges + a faint field across the lanes
+    this.agTex = canvasTex(64, 128, (c, w, h) => {
+      c.clearRect(0, 0, w, h);
+      for (let y = 0; y < h; y += 32) { c.strokeStyle = 'rgba(255,255,255,0.95)'; c.lineWidth = 7; c.beginPath(); c.moveTo(6, y + 26); c.lineTo(w / 2, y + 6); c.lineTo(w - 6, y + 26); c.stroke(); }
+    }, { repeat: true });
+    const edgeMat = new THREE.MeshBasicMaterial({ map: this.agTex, color: new THREE.Color(0xff3df0).multiplyScalar(1.8), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -3 });
+    const fieldMat = new THREE.MeshBasicMaterial({ color: 0x8a40ff, transparent: true, opacity: 0.14, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2 });
+    this.agFieldMat = fieldMat;
+    for (const a of this.ags) {
+      for (const side of [-1, 1]) this.group.add(new THREE.Mesh(this._ribbon(a.s0, a.s1, side * (HALF_W - 2.6), side * (HALF_W - 0.4), 0.07, 6), edgeMat));
+      this.group.add(new THREE.Mesh(this._ribbon(a.s0 + 10, a.s1 - 10, -HALF_W + 2.6, HALF_W - 2.6, 0.06, 20), fieldMat));
+      // entry/exit rings
+      for (const at of [a.s0 + 4, a.s1 - 4]) {
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(HALF_W + 2, 0.45, 6, 48, Math.PI), new THREE.MeshBasicMaterial({ color: new THREE.Color(0xff3df0).multiplyScalar(2) }));
+        this._placeOnRoad(ring, at, 0, 0); this.group.add(ring);
+      }
+      // bumpers: glowing magnetic pylons
+      for (const b of a.bumpers) {
+        const g = new THREE.Group();
+        g.add(new THREE.Mesh(new THREE.CylinderGeometry(b.r, b.r * 1.15, 1.6, 20), new THREE.MeshStandardMaterial({ color: 0x1a0f2a, roughness: 0.3, metalness: 0.8 })));
+        const band = new THREE.Mesh(new THREE.TorusGeometry(b.r * 1.08, 0.12, 6, 28), new THREE.MeshBasicMaterial({ color: new THREE.Color(0xff3df0).multiplyScalar(2.2) }));
+        band.rotation.x = Math.PI / 2; band.position.y = 0.55; g.add(band);
+        const top = band.clone(); top.position.y = 0.95; g.add(top);
+        const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex(), color: 0xff3df0, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.6 }));
+        glow.scale.setScalar(4.5); glow.position.y = 0.8; g.add(glow);
+        this._placeOnRoad(g, b.s, b.x, 0.8); this.group.add(g);
+        b.mesh = g; b.pulse = 0;
+      }
+    }
+  }
+
+  _crestMeshes() {
+    // a glowing lip line at each crest tells the player where to time a stunt hop
+    const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffd84d).multiplyScalar(1.8), transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3 });
+    this.crestMat = mat;
+    for (const c of this.crests) {
+      for (const off of [-1.2, 0]) this.group.add(new THREE.Mesh(this._ribbon(c.s + off - 0.25, c.s + off + 0.25, -HALF_W + 0.6, HALF_W - 0.6, 0.08), mat));
+    }
+  }
+
+  _tokenMeshes() {
+    // instanced hex tokens (track lines); loose dropped tokens are drawn by the race
+    const n = this.tokens.length;
+    if (!n) return;
+    const geo = tokenGeometry();
+    const mat = new THREE.MeshStandardMaterial({ color: 0xffc83d, emissive: new THREE.Color(0xffb020), emissiveIntensity: 0.9, roughness: 0.25, metalness: 0.9 });
+    const im = new THREE.InstancedMesh(geo, mat, n);
+    const tmp = new THREE.Object3D();
+    this.tokens.forEach((t, k) => { this._placeOnRoad(tmp, t.s, t.x, 1.1); tmp.updateMatrix(); t.matrix = tmp.matrix.clone(); t.k = k; im.setMatrixAt(k, t.matrix); });
+    this.tokenMesh = im; this.group.add(im);
   }
 
   _hazardMesh(h) {
@@ -764,6 +915,19 @@ export class Track {
     const t = this.time;
     if (this.stripTex) this.stripTex.offset.y = (t * 1.6) % 1;
     if (this.warnMat) this.warnMat.opacity = 0.55 + 0.4 * Math.sin(t * 6);
+    if (this.agTex) this.agTex.offset.y = (t * 2.4) % 1;
+    if (this.agFieldMat) this.agFieldMat.opacity = 0.1 + 0.06 * Math.sin(t * 5);
+    if (this.crestMat) this.crestMat.opacity = 0.55 + 0.4 * Math.abs(Math.sin(t * 4));
+    for (const a of this.ags) for (const b of a.bumpers) if (b.mesh) { b.pulse = Math.max(0, b.pulse - dt * 3); b.mesh.children[3].scale.setScalar(4.5 + b.pulse * 5); b.mesh.rotation.y += dt * 2; }
+    if (this.tokenMesh) {
+      const im = this.tokenMesh, spin = _tq.setFromAxisAngle(_ty, t * 3);
+      for (const tk of this.tokens) {
+        if (!tk.active) { tk.timer -= dt; if (tk.timer <= 0) tk.active = true; }
+        if (tk.active) { _tm.copy(tk.matrix).multiply(_tm2.makeRotationFromQuaternion(spin)); im.setMatrixAt(tk.k, _tm); }
+        else im.setMatrixAt(tk.k, _cz);
+      }
+      im.instanceMatrix.needsUpdate = true;
+    }
     if (this.capMeshes) {
       const { shell, rings, core, gpos } = this.capMeshes;
       const m = _cm, q = _cq, zero = _cz, gp = gpos.attributes.position;
@@ -831,6 +995,17 @@ export class Track {
 }
 
 const _cm = new THREE.Matrix4(), _cq = new THREE.Quaternion(), _cz = new THREE.Matrix4().makeScale(0, 0, 0), _ce = new THREE.Euler(), _cp = new THREE.Vector3(), _cs = new THREE.Vector3();
+const _tq = new THREE.Quaternion(), _ty = new THREE.Vector3(0, 1, 0), _tm = new THREE.Matrix4(), _tm2 = new THREE.Matrix4();
+let _tokGeo;
+export function tokenGeometry() {
+  if (_tokGeo) return _tokGeo;
+  // bevelled hexagonal chip standing upright, facing the driver
+  const sh = new THREE.Shape();
+  for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3 + Math.PI / 6; k ? sh.lineTo(Math.cos(a) * 0.62, Math.sin(a) * 0.62) : sh.moveTo(Math.cos(a) * 0.62, Math.sin(a) * 0.62); }
+  const hole = new THREE.Path(); hole.absarc(0, 0, 0.24, 0, Math.PI * 2, true); sh.holes.push(hole);
+  _tokGeo = new THREE.ExtrudeGeometry(sh, { depth: 0.12, bevelEnabled: true, bevelSize: 0.05, bevelThickness: 0.05, bevelSegments: 2, curveSegments: 16 }).translate(0, 0, -0.06);
+  return _tokGeo;
+}
 function mergeRings() {
   const a = new THREE.TorusGeometry(1.05, 0.08, 4, 16).rotateX(Math.PI / 2);
   const b = a.clone(); a.translate(0, 1, 0); b.translate(0, -1, 0);

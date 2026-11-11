@@ -1,6 +1,6 @@
 import { itemInfo, LAPS, FUSIONS, fusionKey } from './data.js';
 import { fmtTime, hex, ordinal, clamp } from './util.js';
-import { DRIFT_COLORS } from './racer.js';
+import { DRIFT_COLORS, DRIFT_LV, MAX_TOKENS } from './racer.js';
 
 export class HUD {
   constructor(game, root) {
@@ -9,6 +9,7 @@ export class HUD {
       <div class="h-tl">
         <div class="h-pos"><b>8</b><sup>th</sup><small>/8</small></div>
         <div class="h-lap">LAP <b>1</b>/${LAPS}</div>
+        <div class="h-tok"><b>0</b><span>${'<i></i>'.repeat(MAX_TOKENS)}</span></div>
         <div class="h-time">0:00.00</div>
         <ol class="h-board"></ol>
       </div>
@@ -33,7 +34,7 @@ export class HUD {
       </div>`;
     this.q = s => root.querySelector(s);
     this.el = {
-      pos: this.q('.h-pos b'), posSup: this.q('.h-pos sup'), posTot: this.q('.h-pos small'), lap: this.q('.h-lap b'), time: this.q('.h-time'), board: this.q('.h-board'),
+      pos: this.q('.h-pos b'), posSup: this.q('.h-pos sup'), posTot: this.q('.h-pos small'), lap: this.q('.h-lap b'), tok: this.q('.h-tok'), tokN: this.q('.h-tok b'), time: this.q('.h-time'), board: this.q('.h-board'),
       s0: this.q('.s0'), s1: this.q('.s1'), fuse: this.q('.fusehint'), map: this.q('.h-map'), spdC: this.q('.h-speed canvas'), spd: this.q('.h-speed b'),
       drift: this.q('.h-drift'), driftBar: this.q('.h-drift i'), driftTxt: this.q('.h-drift span'), melee: this.q('.h-melee'), meleeCd: this.q('.h-melee .cd'),
       count: this.q('.h-count'), banner: this.q('.h-banner'), pop: this.q('.h-pop'), feedEl: this.q('.h-feed'), glitch: this.q('.h-glitch'), fps: this.q('.h-fps'),
@@ -99,6 +100,11 @@ export class HUD {
     this.frame++;
     this._set('pos', pl.place, v => { el.pos.textContent = v; el.posSup.textContent = ordinal(v).replace(/\d+/, ''); el.pos.parentElement.dataset.p = v; });
     this._set('lap', Math.min(LAPS, Math.max(1, pl.lap + 1)), v => el.lap.textContent = v);
+    this._set('tok', pl.tokens, v => {
+      el.tokN.textContent = v; el.tok.classList.toggle('max', v >= MAX_TOKENS);
+      [...el.tok.querySelectorAll('i')].forEach((p, i) => p.classList.toggle('on', i < v));
+      el.tok.classList.remove('bump'); void el.tok.offsetWidth; el.tok.classList.add('bump');
+    });
     const t = pl.finished ? pl.finishTime : Math.max(0, race.time);
     if (this.frame % 3 === 0) el.time.textContent = fmtTime(t) + (race.mode === 'tt' && isFinite(pl.bestLap) ? `  ·  BEST ${fmtTime(pl.bestLap)}` : '');
     // leaderboard
@@ -127,7 +133,7 @@ export class HUD {
     this._set('fuse', fz ? fz.id : '', () => { el.fuse.innerHTML = fz ? `<b>FUSE ▸</b> ${fz.icon} ${fz.name}` : ''; el.fuse.classList.toggle('on', !!fz); this.game.touchFuse(!!fz); });
     // drift meter
     const d = pl.drift;
-    const lvMax = [0.85, 1.75, 2.7];
+    const lvMax = DRIFT_LV;
     const frac = d.on ? clamp(d.t / lvMax[2], 0, 1) : 0;
     this._set('dr', Math.round(frac * 100) + '_' + d.level + '_' + d.on, () => {
       el.drift.classList.toggle('on', d.on);

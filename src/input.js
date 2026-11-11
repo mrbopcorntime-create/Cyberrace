@@ -163,7 +163,7 @@ export class Input {
       <div class="tbtn steerR" data-b="right">▶</div>
       <div class="tbtn accel" data-b="accel"><span>GO</span></div>
       <div class="tbtn brake" data-b="brake"><span>BRAKE</span></div>
-      <div class="tbtn drift" data-b="drift"><span>DRIFT</span><i class="dl"></i></div>
+      <div class="tbtn drift" data-b="drift"><span>HOP<br>DRIFT</span><i class="dl"></i></div>
       <div class="tbtn item" data-b="item"><span>ITEM</span></div>
       <div class="tbtn melee" data-b="melee"><span>STRIKE</span><svg viewBox="0 0 40 40"><circle class="cd" cx="20" cy="20" r="18"/></svg></div>
       <div class="tbtn fuse" data-b="fuse"><span>FUSE</span></div>

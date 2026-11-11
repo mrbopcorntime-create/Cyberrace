@@ -75,6 +75,7 @@ const CUE = {
   drift_start: [-12, 'sfx'], tick1: [-9, 'ui'], tick2: [-8, 'ui'], tick3: [-7, 'ui'],
   pickup: [-9, 'sfx'], fuse: [-6, 'ui'], shoot_seek: [-8, 'sfx'],
   elec_pulse: [-12, 'amb'], crackle1: [-10, 'eng'], crackle2: [-10, 'eng'], crackle3: [-9, 'eng'], pneumatic: [-10, 'eng'],
+  hop: [-10, 'sfx'], trick: [-6, 'sfx'], token: [-9, 'sfx'], spinboost: [-4, 'sfx'],
 };
 // legacy names used around the codebase
 const ALIAS = { go: 'cd_go', boost: 'boost', hit: 'explode', zap: 'zap', clang: 'melee', scrape: 'wall', pickup: 'pickup', fuse: 'fuse', shoot: 'plasma_fire', drop: 'trap_lay', shield: 'shield_up', block: 'shield_block', emp: 'emp', laser: 'laser', derez: 'derez', driftstart: 'drift_start', launch: 'jump', dash: 'dash', lap: 'lap', final: 'final_lap', win: 'finish', finish: 'finish', ui: 'ui_move', uiok: 'ui_ok', uiback: 'ui_back', unlock: 'unlock' };

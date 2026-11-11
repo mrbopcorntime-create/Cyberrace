@@ -250,7 +250,7 @@ export const ACHIEVEMENTS = [
   A('dist500', 'Bandwidth Hog', 'Drive 500 km in total.', s => s.distance >= 500000, 1500),
   // Drift & speed
   A('drift1', 'Spark Gap', 'Release your first drift boost.', s => s.driftBoosts >= 1, 100),
-  A('drift_ov', 'Overclocked', 'Release a level-3 Overdrive drift boost.', s => s.drift3 >= 1, 200),
+  A('drift_ov', 'Overclocked', 'Release a purple level-3 Overdrive drift boost.', s => s.drift3 >= 1, 200),
   A('drift100', 'Slide Rule', 'Release 100 drift boosts.', s => s.driftBoosts >= 100, 600),
   A('drift_ov100', 'Drift Scholar', 'Release 100 Overdrive boosts. Unlocks PERPLEXITY.', s => s.drift3 >= 100, 1000),
   A('drift_race', 'Sideways Session', 'Release 15 drift boosts in one race.', (s, e) => e && e.driftBoosts >= 15, 500),
@@ -258,7 +258,10 @@ export const ACHIEVEMENTS = [
   A('pads200', 'Strip Mined', 'Hit 200 boost strips.', s => s.pads >= 200, 400),
   A('air2', 'Airborne Packet', 'Stay airborne for 1.5 seconds in one jump.', (s, e, f) => f.air2, 300),
   A('air300', 'Frequent Flyer', 'Spend 5 minutes airborne in total.', s => s.air >= 300, 800),
-  A('land50', 'Stuck the Landing', 'Perform 50 perfect landings.', s => s.lands >= 50, 500),
+  A('land50', 'Stunt Double', 'Land 50 stunt boosts off ramps and crests.', s => s.lands >= 50, 500),
+  A('tokens10', 'Full Cache', 'Hold the maximum of 10 speed tokens.', (s, e, f) => f.tokens10, 300),
+  A('tokens500', 'Token Economy', 'Collect 500 speed tokens.', s => s.tokens >= 500, 800),
+  A('spin25', 'Magnetic Personality', 'Trigger 25 anti-grav spin boosts.', s => s.spinBoosts >= 25, 600),
   // Items
   A('plasma1', 'Target Acquired', 'Hit a rival with a Plasma Sphere.', s => s.plasmaHits >= 1, 100),
   A('plasma50', 'Heat Seeker', 'Land 50 Plasma Sphere hits.', s => s.plasmaHits >= 50, 600),

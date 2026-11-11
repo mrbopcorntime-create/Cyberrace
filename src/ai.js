@@ -36,6 +36,11 @@ export class AIDriver {
       const d = wrap(c.s - s0, tr.L);
       if (d > 8 && d < 45) { pull = c.x; pullW = 0.75; break; }
     }
+    if (pull === null && r.tokens < 10) for (const tk of tr.tokens) {
+      if (!tk.active) continue;
+      const d = wrap(tk.s - s0, tr.L);
+      if (d > 6 && d < 40) { pull = tk.x; pullW = 0.55 + 0.03 * (10 - r.tokens); break; }
+    }
     if (pull === null) for (const st of tr.strips) {
       const d = wrap(st.s - s0, tr.L);
       if (d > 5 && d < 50) { pull = st.x; pullW = st.ramp ? 1 : 0.6; break; }
@@ -80,16 +85,36 @@ export class AIDriver {
 
     // drifting on sharp bends
     const sharp = Math.abs(kFar.max);
+    this.hopCd = Math.max(0, (this.hopCd || 0) - dt);
+    this.commit = Math.max(0, (this.commit || 0) - dt);
     if (!r.drift.on) {
-      inp.drift = !nearJump && sharp > 0.0085 && Math.abs(kNear) > 0.0075 && r.speed > 30 && Math.random() < 0.9 * this.skill && Math.sign(kNear) === Math.sign(kFar.max) && Math.abs(r.x) < HALF_W - 5;
-      if (inp.drift && Math.abs(inp.steer) < 0.3) inp.steer = Math.sign(kFar.max) * 0.5;
+      if (this.commit > 0) {
+        // committed to a hop-drift: keep the button held and the stick turned until it lands sideways
+        inp.drift = true;
+        inp.steer = this.commitDir * Math.max(0.5, Math.min(1, inp.steer * this.commitDir + 0.1));   // follow the bend (keeps feed-forward) + turn-in
+      } else {
+        const openNear = tr.isOpen(s0) || tr.isOpen(s0 + 30) || tr.isOpen(s0 + 60) || tr.isOpen(s0 + 90);
+        const want = !openNear && !nearJump && this.hopCd <= 0 && Math.abs(kFar.avg) > 0.0042 && Math.abs(kNear) > 0.0038 && r.speed > 30 && Math.random() < 0.9 * this.skill && Math.sign(kNear) === Math.sign(kFar.avg) && Math.abs(r.x) < HALF_W - 4;
+        inp.drift = want;
+        if (want) {
+          this.commit = 0.5; this.commitDir = Math.sign(kFar.avg); this.hopCd = 0.9;
+          inp.driftPressed = true;                                     // hop
+          inp.steer = this.commitDir * Math.max(0.5, Math.min(1, inp.steer * this.commitDir + 0.1));
+        }
+      }
     } else {
-      const done = r.drift.level >= 3 || (Math.abs(kNear) < 0.004 && r.drift.level >= 1) || Math.abs(kNear) < 0.0015 || Math.abs(r.psi) > 0.75 || Math.abs(r.x) > HALF_W - 3;
+      this.commit = 0;
+      // hold to the highest tier the bend allows; release when the bend runs out
+      const bendLeft = (Math.abs(kNear) > 0.0018 && Math.sign(kNear) === r.drift.dir) || (Math.abs(kFar.avg) > 0.0028 && Math.sign(kFar.avg) === r.drift.dir);
+      const done = r.drift.level >= 3 || (!bendLeft && (r.drift.level >= 1 || Math.abs(kNear) < 0.0015)) || Math.abs(r.psi) > 0.8;
       inp.drift = !done;
       if (inp.drift) {
         // modulate drift: tighter when far from target line
+        // steer that makes the drift arc match the bend (w = k·v), then correct toward the racing line
         const err = desiredPsi - r.psi;
-        inp.steer = clamp(r.drift.dir + err * 2.2 + ff * 0.4, -1, 1);
+        const need = (kNear * sp * r.drift.dir) / (r.grip * r.driftTurn * 0.62);   // required arc factor
+        const base = (need - 0.6) / 0.55;
+        inp.steer = clamp(r.drift.dir * clamp(base, -1, 1) + err * 1.8, -1, 1);
       }
     }
 
@@ -99,17 +124,27 @@ export class AIDriver {
     const open = tr.isOpen(s0 + 20) || tr.isOpen(s0 + 50);
     inp.brake = 0;
     if (r.drift.on && r.speed > vMax * 1.35) inp.drift = false;
-    // edge guard: predict lateral position 0.55 s ahead and pull away from the edge
-    const px = r.x + (r.speed * Math.sin(r.psi) + r.vx) * 0.55;
-    if (Math.abs(px) > HALF_W - 1.8) {
-      inp.steer = -Math.sign(px);
-      if (r.drift.on && Math.sign(px) === -r.drift.dir) { /* drifting toward inside: tighten */ inp.steer = r.drift.dir; }
-      else if (r.drift.on) inp.drift = false;
+    // edge guard: predict lateral position ahead and pull away from the edge.
+    // While hopping/drifting the drift arc itself is the correction, so look shorter and act later.
+    const openEdge = tr.isOpen(s0) || tr.isOpen(s0 + 15) || tr.isOpen(s0 + 35);
+    const sliding = (this.commit > 0 || r.hopping || r.drift.on) && !openEdge;
+    const px = r.x + (r.speed * Math.sin(r.psi) + r.vx) * (sliding ? 0.3 : 0.55);
+    if (Math.abs(px) > HALF_W - (sliding ? 0.6 : 1.8)) {
+      if (r.drift.on) {
+        // heading for the wall on the drift's own side → counter-steer to widen; on the far side → tighten
+        inp.steer = Math.sign(px) === r.drift.dir ? -r.drift.dir : r.drift.dir;
+        if ((openEdge || Math.abs(r.x) > HALF_W - 1.5) && Math.sign(r.x) === Math.sign(px)) inp.drift = false;   // out of room
+      } else { inp.steer = -Math.sign(px); this.commit = 0; }
       if (Math.abs(px) > HALF_W + 2 && Math.abs(r.psi) > 0.3) { inp.throttle = 0.3; }
     }
     if (r.speed > vMax * (open ? 1.0 : 1.12)) { if (r.speed > vMax * 1.25 && !r.drift.on) { inp.throttle = 0; inp.brake = 0.6; } else inp.throttle = 0.4; }
     else inp.throttle = 1;
-    if (r.air && Math.random() < 0.05 * this.skill) inp.driftPressed = true;
+    // stunts: press just before a ramp lip or crest
+    this.trickCd = Math.max(0, (this.trickCd || 0) - dt);
+    if (!r.air && this.trickCd <= 0) {
+      const la = tr.launchAhead(r.s, Math.max(2, r.speed * 0.15));
+      if (la) { this.trickCd = 1.2; if (Math.random() < 0.8 * this.skill) inp.driftPressed = true; }
+    }
 
     // combat
     this.think -= dt;

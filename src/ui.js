@@ -237,7 +237,7 @@ export class UI {
       <div class="logo"><span class="l1">NEON</span><span class="l2">CYBER RUSH</span></div>
       <div class="tag">COMBAT RACING · 8 RACERS · 24 CIRCUITS</div>
       <button class="press primary" data-act="start">TAP OR PRESS Ⓐ TO START</button>
-      <div class="ver">v1.0 · ${this.game.platform}</div>
+      <div class="ver">v1.3 · ${this.game.platform}</div>
     </div>`;
   }
   r_main() {
@@ -390,10 +390,15 @@ export class UI {
     <div class="guide scroll">
       <section data-f="1"><h3>THE RACE</h3><p>8 racers, ${LAPS} laps. Points per place: ${POINTS.join(' · ')}. Top 3 in a tournament wins a trophy; a podium unlocks the next cup. Gold any cup at 2.0 GHz to unlock 3.0 GHz.</p>
       <p><b>Rocket start:</b> press accelerate just as "1" fades (about half a second before GO). Hold it too early and you stall.</p></section>
-      <section data-f="1"><h3>DRIFT &amp; CHARGE</h3><p>Hold DRIFT while steering into a bend. Sparks change colour as charge builds: <b style="color:#3fd8ff">SPARK</b> → <b style="color:#c060ff">OVERCLOCK</b> → <b style="color:#ff8a1a">OVERDRIVE</b>. Release for a boost — longer charge, bigger boost. Steering into the drift tightens it and charges faster.</p>
-      <p><b>Overdrive Slam:</b> a Melee Strike while holding Overclock or higher charge spends the charge for a 1.5× shove that also spins the target.</p></section>
+      <section data-f="1"><h3>HOP &amp; DRIFT</h3><p>The DRIFT button <b>hops</b>. Hop while turning and you land sideways in a drift — keep holding the button to stay in it. Steer <i>into</i> the bend to tighten the arc, counter-steer to widen it. You never need to lift off the throttle, even through hairpins.</p>
+      <p>Holding a drift charges a boost, shown by the sparks: <b style="color:#2fa8ff">BLUE</b> (short drift, brief burst) → <b style="color:#ff8a1a">ORANGE</b> (longer, stronger) → <b style="color:#d040ff">PURPLE</b> (the limit — a long, intense surge). Sharper drifts charge faster. Release the button to fire it.</p>
+      <p><b>Overdrive Slam:</b> a Melee Strike while holding orange or purple charge spends it for a 1.5× shove that also spins the target.</p></section>
       <section data-f="1"><h3>MELEE STRIKE</h3><p>Every vehicle has a cooldown shove. Near a rival it side-swipes them across the track — shove them off a rail-less edge (red warning lines) to derez them. With nobody in reach it becomes a <b>side-dash</b>: dash at the right moment and a homing Plasma Sphere misses you. Quads hit hardest; bikes recharge fastest.</p></section>
-      <section data-f="1"><h3>AIR, SLIPSTREAM, STRIPS</h3><p>Tap DRIFT while airborne to arm a <b>perfect landing</b> boost. Ride close behind a rival to charge the slipstream ring on your speedometer. Boost strips sit before every ramp — miss them and you may not clear the gap.</p></section>
+      <section data-f="1"><h3>STUNTS</h3><p>Press DRIFT right at the lip of a ramp or a crest (the pulsing gold lines) to pull a stunt. Land it for an instant speed burst — bigger the longer you were airborne.</p></section>
+      <section data-f="1"><h3>ANTI-GRAV</h3><p>Magenta chevron sections are magnetic: the road tilts up the wall and you hover. Physics flip here — bumping a rival or a glowing bumper pylon spins <i>both</i> of you and fires you forward with a <b>spin boost</b> instead of slowing you down. Go looking for contact.</p></section>
+      <section data-f="1"><h3>SPEED TOKENS</h3><p>Gold hex tokens raise your top speed by 0.8% each, up to 10 (+8%). Hold 10 and you outrun an empty-handed rival on any straight. Getting hit drops some (EMP 2, weapons and hazards 3, a melee hit 1) and they scatter for anyone to grab; falling off the track loses them for good.</p></section>
+      <section data-f="1"><h3>SLIPSTREAM &amp; STRIPS</h3><p>Sit in the pocket right behind a rival for about two seconds: a wind tunnel builds around you, then fires a slingshot surge. Boost strips sit before every ramp — miss them and you may not clear the gap.</p></section>
+      <section data-f="1"><h3>LAUNCH</h3><p>Hold accelerate as the "1" fades for a <b>perfect launch</b>; a little early or late still gets a smaller rocket start. Rev before "2" is gone and the engine stalls.</p></section>
       <section data-f="1"><h3>ITEMS</h3><p>Capsules give items into two slots. Leaders get defensive items; racers at the back get speed and firepower.</p><div class="fzs">${items}</div></section>
       <section data-f="1"><h3>FUSION — COMBINE BOTH SLOTS</h3><p>With two items held, press FUSE (or tap the item slots) to merge them into one empowered item. Every pairing makes something different:</p><div class="fzs">${fz}</div></section>
       <section data-f="1"><h3>CONTROLLER</h3><p>RT accelerate · LT brake/reverse · Left stick steer · R1 drift · L1 or X item · Y fuse · B melee · Right-stick click camera · D-pad up/down view distance · Push right stick down to look back · START pause.</p></section>
