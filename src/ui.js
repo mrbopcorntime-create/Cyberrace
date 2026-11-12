@@ -3,6 +3,7 @@ import { Track } from './track.js';
 import { hex, fmtTime, ordinal } from './util.js';
 import { saveProfile, upgradeSpent } from './save.js';
 import { CAM_ZOOM } from './race.js';
+import { PAD_ACTIONS, PAD_LABEL } from './input.js';
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const statBar = (label, v) => `<div class="stat"><span>${label}</span><div class="sb"><i style="width:${v * 10}%"></i></div></div>`;
@@ -164,6 +165,12 @@ export class UI {
       case 'up': this.upgrade(ds.v, +ds.d); break;
       case 'set': this.setSetting(ds.k, ds.v === 'true' ? true : ds.v === 'false' ? false : ds.v); this.refresh(); break;
       case 'resetsave': this.show('confirmreset'); break;
+      case 'rebind': {
+        const inp = g.input;
+        if (inp.capture === ds.v) { inp.capture = null; this.refresh(); break; }   // tap again to cancel
+        inp.startCapture(ds.v); inp.onCapture = () => { g.audio.sfx('ui'); this.refresh(); }; this.refresh(); break;
+      }
+      case 'resetbinds': g.input.resetBinds(); g.input.capture = null; this.refresh(); break;
       case 'doreset': g.resetProfile(); this.show('main', false); break;
       // pause
       case 'resume': g.resume(); break;
@@ -401,7 +408,7 @@ export class UI {
       <section data-f="1"><h3>LAUNCH</h3><p>Hold accelerate as the "1" fades for a <b>perfect launch</b>; a little early or late still gets a smaller rocket start. Rev before "2" is gone and the engine stalls.</p></section>
       <section data-f="1"><h3>ITEMS</h3><p>Capsules give items into two slots. Leaders get defensive items; racers at the back get speed and firepower.</p><div class="fzs">${items}</div></section>
       <section data-f="1"><h3>FUSION — COMBINE BOTH SLOTS</h3><p>With two items held, press FUSE (or tap the item slots) to merge them into one empowered item. Every pairing makes something different:</p><div class="fzs">${fz}</div></section>
-      <section data-f="1"><h3>CONTROLLER</h3><p>RT accelerate · LT brake/reverse · Left stick steer · R1 drift · L1 or X item · Y fuse · B melee · Right-stick click camera · D-pad up/down view distance · Push right stick down to look back · START pause.</p></section>
+      <section data-f="1"><h3>CONTROLLER</h3><p>${PAD_ACTIONS.map(a => `${a.label.toLowerCase()} <b>${(this.game.input.binds()[a.id] || []).map(n => PAD_LABEL[n] || n).join('/')}</b>`).join(' · ')} · left stick steers · MENU pauses. Every button can be remapped in Settings.</p></section>
       <section data-f="1"><h3>TOUCH</h3><p>Left thumb steers (floating stick, buttons, or tilt). Right thumb: GO, DRIFT, ITEM, STRIKE, BRAKE. Slide your thumb between GO and DRIFT without lifting. Turn on Auto-Accelerate in Settings for one-thumb play.</p></section>
     </div>`;
   }
@@ -424,6 +431,10 @@ export class UI {
       <div class="srow"><span>HAPTICS</span>${opt('haptics', true, 'ON')}${opt('haptics', false, 'OFF')}</div>
       <div class="srow"><span>SHOW FPS</span>${opt('showFps', true, 'ON')}${opt('showFps', false, 'OFF')}</div>
       ${sl('musicVol', 0, 1, 0.05, 'MUSIC')}${sl('sfxVol', 0, 1, 0.05, 'EFFECTS')}
+      <h4 class="shead">CONTROLLER BUTTONS <small>select an action, then press the button you want · MENU cancels</small></h4>
+      ${PAD_ACTIONS.map(a => { const cap = this.game.input.capture === a.id, b = this.game.input.binds()[a.id] || [];
+        return `<div class="srow bind"><span>${a.label}</span><button class="tab ${cap ? 'selected capture' : ''}" data-act="rebind" data-v="${a.id}" data-key="b_${a.id}">${cap ? 'PRESS A BUTTON…' : b.map(n => `<kbd>${PAD_LABEL[n] || n}</kbd>`).join(' ') || '—'}</button></div>`; }).join('')}
+      <div class="srow"><span></span><button class="tab" data-act="resetbinds" data-key="resetbinds">RESET CONTROLLER TO DEFAULT</button></div>
       <div class="srow"><span>DATA</span><button class="tab danger" data-act="resetsave" data-key="reset">RESET PROGRESS</button></div>
     </div>`;
   }

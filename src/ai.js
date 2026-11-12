@@ -1,5 +1,6 @@
 import { HALF_W } from './track.js';
 import { clamp, wrap } from './util.js';
+import { DRIFT_FOLLOW, DRIFT_BIAS } from './racer.js';
 
 // Drives a Racer by writing to racer.inp each frame.
 export class AIDriver {
@@ -94,7 +95,7 @@ export class AIDriver {
         inp.steer = this.commitDir * Math.max(0.5, Math.min(1, inp.steer * this.commitDir + 0.1));   // follow the bend (keeps feed-forward) + turn-in
       } else {
         const openNear = tr.isOpen(s0) || tr.isOpen(s0 + 30) || tr.isOpen(s0 + 60) || tr.isOpen(s0 + 90);
-        const want = !openNear && !nearJump && this.hopCd <= 0 && Math.abs(kFar.avg) > 0.0042 && Math.abs(kNear) > 0.0038 && r.speed > 30 && Math.random() < 0.9 * this.skill && Math.sign(kNear) === Math.sign(kFar.avg) && Math.abs(r.x) < HALF_W - 4;
+        const want = !openNear && !nearJump && this.hopCd <= 0 && Math.abs(kFar.avg) > 0.0032 && Math.abs(kNear) > 0.0028 && r.speed > 30 && Math.random() < 0.9 * this.skill && Math.sign(kNear) === Math.sign(kFar.avg) && Math.abs(r.x) < HALF_W - 4;
         inp.drift = want;
         if (want) {
           this.commit = 0.5; this.commitDir = Math.sign(kFar.avg); this.hopCd = 0.9;
@@ -112,8 +113,9 @@ export class AIDriver {
         // modulate drift: tighter when far from target line
         // steer that makes the drift arc match the bend (w = k·v), then correct toward the racing line
         const err = desiredPsi - r.psi;
-        const need = (kNear * sp * r.drift.dir) / (r.grip * r.driftTurn * 0.62);   // required arc factor
-        const base = (need - 0.6) / 0.55;
+        const kd = kNear * sp * r.drift.dir, follow = kd > 0 ? kd * DRIFT_FOLLOW : 0;
+        const need = (kd - follow) / (r.grip * r.driftTurn * 0.62);   // arc factor still required beyond the road-follow
+        const base = (need - DRIFT_BIAS) / 0.55;
         inp.steer = clamp(r.drift.dir * clamp(base, -1, 1) + err * 1.8, -1, 1);
       }
     }

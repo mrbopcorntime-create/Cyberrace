@@ -2,8 +2,9 @@ import * as THREE from 'three';
 import { mulberry32, clamp, canvasTex, rgba, glowTex, glowMat, wrap, mergeStatic } from './util.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
-export const ROAD_W = 24;
+export const ROAD_W = 30;            // v1.4: widened from 24 m so drifts have room to hold
 export const HALF_W = ROAD_W / 2;
+const WS = HALF_W / 12;               // lateral scale for features authored on the old 24 m road
 const STEP_TARGET = 1;   // 2x spline/mesh density (was 2 m)
 const SPS = 1 / STEP_TARGET; // samples per metre, for sample-count constants
 
@@ -243,7 +244,7 @@ export class Track {
       }
       // magnetic bumpers: touching one spins you and fires you forward
       seg.bumpers = [];
-      for (let k = 0; k < 3; k++) seg.bumpers.push({ s: best + RAMP + 18 + k * ((AGL - 2 * RAMP - 36) / 2), x: [-6.5, 6.5, 0][k] * (rnd() < 0.5 ? 1 : -1), r: 1.2, cd: new Map() });
+      for (let k = 0; k < 3; k++) seg.bumpers.push({ s: best + RAMP + 18 + k * ((AGL - 2 * RAMP - 36) / 2), x: [-6.5, 6.5, 0][k] * WS * (rnd() < 0.5 ? 1 : -1), r: 1.2, cd: new Map() });
     }
     if (this.ags.length) this._applyBank();
 
@@ -292,7 +293,7 @@ export class Track {
       for (let tries = 0; tries < 30; tries++) {
         const s = 100 + rnd() * (L - 200);
         if (!free(s - 2, s + 12)) continue;
-        this.strips.push({ s, x: (rnd() - 0.5) * 14, len: 10, w: 5.5 });
+        this.strips.push({ s, x: (rnd() - 0.5) * 14 * WS, len: 10, w: 5.5 });
         take(s - 2, s + 12);
         break;
       }
@@ -307,18 +308,18 @@ export class Track {
       let s = L * ((r + 0.35) / rows);
       for (let tries = 0; tries < 30 && !free(s - 3, s + 3); tries++) s += 13;
       take(s - 3, s + 3);
-      for (let c = -2; c <= 2; c++) this.capsules.push({ s, x: c * 4.2, active: true, timer: 0 });
+      for (let c = -2; c <= 2; c++) this.capsules.push({ s, x: c * 4.2 * WS, active: true, timer: 0 });
     }
 
     // speed tokens: lines of 5 along a lane, guaranteed through every anti-grav section
     this.tokens = [];
     const addLine = (s0, x, n = 5) => { for (let k = 0; k < n; k++) { const s = s0 + k * 5; if (!this.surface(s).gap) this.tokens.push({ s, x, active: true, timer: 0 }); } };
-    for (const a of this.ags) addLine(a.s0 + 60, (rnd() < 0.5 ? -1 : 1) * 4.5, 6);
+    for (const a of this.ags) addLine(a.s0 + 60, (rnd() < 0.5 ? -1 : 1) * 4.5 * WS, 6);
     const lines = Math.max(6, Math.round(L / 230));
     for (let k = 0; k < lines; k++) {
       let s = L * ((k + 0.7) / lines) + (rnd() - 0.5) * 40;
       if (s < 100 || s > L - 100 || this.capsules.some(c => Math.abs(c.s - s) < 30) || this.jumps.some(j => s > j.s0 - 30 && s < j.s0 + j.ramp + j.gap + 10)) continue;
-      addLine(s, [-7, -3.5, 0, 3.5, 7][Math.floor(rnd() * 5)]);
+      addLine(s, [-7, -3.5, 0, 3.5, 7][Math.floor(rnd() * 5)] * WS);
     }
 
     // hazards
@@ -335,7 +336,7 @@ export class Track {
           const h = { type, s, len, phase: rnd() * 6.28, state: 0 };
           if (type === 'barrier') { h.amp = HALF_W - 3.4; h.speed = 0.9 + rnd() * 0.6; h.w = 5.5; h.x = 0; }
           if (type === 'firewall') { h.period = 3.2; h.side = 1; }
-          if (type === 'mine') { h.mines = [0, 1, 2].map(m => ({ s: s + m * 12, x: (rnd() - 0.5) * 18, active: true, t: 0 })); }
+          if (type === 'mine') { h.mines = [0, 1, 2].map(m => ({ s: s + m * 12, x: (rnd() - 0.5) * 18 * WS, active: true, t: 0 })); }
           if (type === 'pulse') { h.period = 3.4; h.on = false; }
           this.hazards.push(h);
           break;

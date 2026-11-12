@@ -3,6 +3,19 @@ import { clamp } from './util.js';
 // Android KeyEvent codes
 const K = { A: 96, B: 97, X: 99, Y: 100, L1: 102, R1: 103, L2: 104, R2: 105, LS: 106, RS: 107, START: 108, SELECT: 109, MODE: 110, UP: 19, DOWN: 20, LEFT: 21, RIGHT: 22, CENTER: 23, ENTER: 66, ESC: 111 };
 
+// Controller remapping (v1.4). Buttons are named, not coded, so native Android keys, analog triggers,
+// the hat and the browser Gamepad API all feed one held-set. L2/R2 keys and the trigger axes share LT/RT.
+const KEY_NAME = { [K.A]: 'A', [K.B]: 'B', [K.X]: 'X', [K.Y]: 'Y', [K.L1]: 'L1', [K.R1]: 'R1', [K.L2]: 'LT', [K.R2]: 'RT', [K.LS]: 'LS', [K.RS]: 'RS', [K.START]: 'START', [K.SELECT]: 'SELECT', [K.UP]: 'UP', [K.DOWN]: 'DOWN', [K.LEFT]: 'LEFT', [K.RIGHT]: 'RIGHT' };
+const GP_NAME = ['A', 'B', 'X', 'Y', 'L1', 'R1', 'LT', 'RT', 'SELECT', 'START', 'LS', 'RS', 'UP', 'DOWN', 'LEFT', 'RIGHT'];
+export const PAD_LABEL = { A: 'A', B: 'B', X: 'X', Y: 'Y', L1: 'LB', R1: 'RB', LT: 'LT', RT: 'RT', LS: 'L3', RS: 'R3', SELECT: 'VIEW', START: 'MENU', UP: 'D-UP', DOWN: 'D-DOWN', LEFT: 'D-LEFT', RIGHT: 'D-RIGHT' };
+export const PAD_ACTIONS = [
+  { id: 'accel', label: 'ACCELERATE' }, { id: 'brake', label: 'BRAKE / REVERSE' }, { id: 'drift', label: 'HOP / DRIFT' },
+  { id: 'item', label: 'USE ITEM' }, { id: 'melee', label: 'MELEE STRIKE' }, { id: 'fuse', label: 'FUSE ITEMS' },
+  { id: 'lookback', label: 'LOOK BACK' }, { id: 'camera', label: 'CAMERA MODE' }, { id: 'zoomIn', label: 'VIEW CLOSER' }, { id: 'zoomOut', label: 'VIEW FARTHER' },
+];
+export const DEFAULT_BINDS = { accel: ['RT', 'A'], brake: ['LT'], drift: ['R1'], item: ['L1', 'X'], melee: ['B'], fuse: ['Y'], lookback: ['LS'], camera: ['RS', 'SELECT'], zoomIn: ['UP'], zoomOut: ['DOWN'] };
+const EDGE_ACTIONS = ['drift', 'item', 'melee', 'fuse', 'camera', 'zoomIn', 'zoomOut'];
+
 export class Input {
   constructor(game) {
     this.game = game;
@@ -10,6 +23,9 @@ export class Input {
     this.edges = { item: false, melee: false, fuse: false, drift: false, camera: false, pause: false, zoom: false };
     this.keys = new Set();
     this.pad = { keys: new Set(), axes: [0, 0, 0, 0, 0, 0, 0, 0], active: false, lastT: 0 };
+    this.held = new Set();          // named pad buttons currently down (keys + triggers + hat + Gamepad API)
+    this.capture = null;            // action id waiting for a button press (settings → controller)
+    this.onCapture = null;
     this.touch = { steer: 0, accel: false, brake: false, drift: false, held: new Map() };
     this.tilt = 0;
     this.onNav = null;
@@ -38,10 +54,12 @@ export class Input {
     // Native Android controller bridge
     window.NCR_padKey = (code, down) => {
       this.pad.active = true; this.lastDevice = 'pad';
+      const n = KEY_NAME[code];
       if (down) {
         this.pad.keys.add(code);
+        if (n && this._press(n)) return;
         this._padEdge(code);
-      } else this.pad.keys.delete(code);
+      } else { this.pad.keys.delete(code); if (n) this._release(n, 'key'); }
     };
     window.NCR_padAxes = ax => {
       this.pad.active = true; this.lastDevice = 'pad';
@@ -52,7 +70,7 @@ export class Input {
       this._axisNav(ax[7], prev[7], 'up', 'down');
       this._axisNav(ax[0], prev[0], 'left', 'right', 0.6);
       this._axisNav(ax[1], prev[1], 'up', 'down', 0.6);
-      if (ax[4] > 0.5 && prev[4] <= 0.5) this.pad.keys.add('LT'); if (ax[4] < 0.4) this.pad.keys.delete('LT');
+      this._axisButtons(ax, prev);
     };
     window.addEventListener('deviceorientation', e => {
       if (e.gamma == null) return;
@@ -63,18 +81,52 @@ export class Input {
     });
   }
 
-  _padEdge(code) {
-    const g = this.game;
-    switch (code) {
-      case K.L1: case K.X: this.edges.item = true; break;
-      case K.B: this.edges.melee = true; break;
-      case K.Y: this.edges.fuse = true; break;
-      case K.R1: this.edges.drift = true; break;
-      case K.RS: case K.SELECT: this.edges.camera = true; break;
-      case K.START: this._nav('start'); break;
+  // triggers and hat → named buttons (threshold with hysteresis)
+  _axisButtons(ax, prev) {
+    const btn = (name, v, pv) => { if (v > 0.5 && !(pv > 0.5)) { if (!this._press(name)) this._padEdgeName(name); } else if (v < 0.4 && pv >= 0.4) this._release(name, 'axis'); };
+    btn('LT', ax[4], prev[4]); btn('RT', ax[5], prev[5]);
+    {   // the hat already drives menu nav via _axisNav; here it only feeds bindings
+      const hb = (name, v, pv) => { if (v > 0.5 && !(pv > 0.5)) this._press(name, true); else if (!(v > 0.5) && pv > 0.5) this._release(name, 'axis'); };
+      hb('RIGHT', ax[6], prev[6]); hb('LEFT', -ax[6], -prev[6]); hb('DOWN', ax[7], prev[7]); hb('UP', -ax[7], -prev[7]);
     }
-    // D-pad up/down while racing (no menu open): view distance closer / farther
-    if ((code === K.UP || code === K.DOWN) && g.race && g.state === 'race' && !g.race.paused && !g.ui.screen) { g.cycleCamZoom(code === K.UP ? -1 : 1); return; }
+  }
+  binds() { const b = this.game.settings.padBinds; return b && typeof b === 'object' ? { ...DEFAULT_BINDS, ...b } : DEFAULT_BINDS; }
+  bound(action) { const l = this.binds()[action] || []; for (const n of l) if (this.held.has(n)) return true; return false; }
+  // returns true when the press was consumed by a remap capture
+  _press(name, fromHat) {
+    this.held.add(name); this.pad.active = true; this.lastDevice = 'pad';
+    if (this.capture) {
+      if (name === 'START') { this._endCapture(null); return true; }   // MENU cancels
+      this._endCapture(name); return true;
+    }
+    const g = this.game, racing = g.race && g.state === 'race' && !g.race.paused && !g.ui.screen;
+    const b = this.binds();
+    for (const a of EDGE_ACTIONS) if ((b[a] || []).includes(name)) {
+      if (a === 'zoomIn' || a === 'zoomOut') { if (racing) { g.cycleCamZoom(a === 'zoomIn' ? -1 : 1); this._zoomUsed = name; } }
+      else this.edges[a] = true;
+    }
+    if (fromHat) return false;
+    return racing && this._zoomUsed === name ? (this._zoomUsed = null, true) : false;
+  }
+  _release(name) { this.held.delete(name); }
+  _endCapture(name) {
+    const a = this.capture; this.capture = null;
+    if (name && a) {
+      const b = { ...this.binds() };
+      // a button does one job: take it off any other action; an action left empty inherits this one's old buttons
+      const old = b[a];
+      for (const k in b) if (k !== a && b[k].includes(name)) { b[k] = b[k].filter(n => n !== name); if (!b[k].length) b[k] = old.filter(n => n !== name); }
+      b[a] = [name];
+      this.game.settings.padBinds = b; this.game.saveSettings();
+    }
+    if (this.onCapture) this.onCapture(a, name);
+  }
+  startCapture(action) { this.capture = action; }
+  resetBinds() { delete this.game.settings.padBinds; this.game.saveSettings(); }
+  _padEdgeName(name) { const code = +Object.keys(KEY_NAME).find(k => KEY_NAME[k] === name); if (code) this._padEdge(code); }
+
+  _padEdge(code) {
+    if (code === K.START) this._nav('start');
     const nav = { [K.UP]: 'up', [K.DOWN]: 'down', [K.LEFT]: 'left', [K.RIGHT]: 'right', [K.A]: 'ok', [K.CENTER]: 'ok', [K.ENTER]: 'ok', [K.B]: 'back', [K.ESC]: 'back' }[code];
     if (nav) this._nav(nav);
     if (code === K.L2) this._nav('prev');
@@ -98,10 +150,10 @@ export class Input {
     const now = gp.buttons.map((x, i) => b(i));
     const edge = i => now[i] && !prev[i];
     if (now.some(x => x) || Math.abs(gp.axes[0]) > 0.3) { this.pad.active = true; this.lastDevice = 'pad'; }
-    const map = { 0: K.A, 1: K.B, 2: K.X, 3: K.Y, 4: K.L1, 5: K.R1, 8: K.SELECT, 9: K.START, 11: K.RS, 12: K.UP, 13: K.DOWN, 14: K.LEFT, 15: K.RIGHT };
-    for (const i in map) {
-      if (edge(+i)) { this.pad.keys.add(map[i]); this._padEdge(map[i]); }
-      if (!now[+i] && prev[+i]) this.pad.keys.delete(map[i]);
+    for (let i = 0; i < GP_NAME.length; i++) {
+      const n = GP_NAME[i];
+      if (edge(i)) { if (!this._press(n)) this._padEdgeName(n); }
+      if (!now[i] && prev[i]) this._release(n);
     }
     const ax = [gp.axes[0] || 0, gp.axes[1] || 0, gp.axes[2] || 0, gp.axes[3] || 0, gp.buttons[6] ? gp.buttons[6].value : 0, gp.buttons[7] ? gp.buttons[7].value : 0, 0, 0];
     const pax = this.pad.axes;
@@ -122,23 +174,26 @@ export class Input {
     if (k.has('ArrowRight') || k.has('KeyD')) steer += 1;
     const stick = Math.abs(ax[0]) > 0.12 ? (ax[0] - Math.sign(ax[0]) * 0.12) / 0.88 : 0;
     steer += stick;
-    if (pk.has(K.LEFT) || ax[6] < -0.5) steer -= 1;
-    if (pk.has(K.RIGHT) || ax[6] > 0.5) steer += 1;
+    const bd = this.binds(), boundAny = n => { for (const a in bd) if (bd[a].includes(n)) return true; return false; };
+    if ((pk.has(K.LEFT) || ax[6] < -0.5) && !boundAny('LEFT')) steer -= 1;
+    if ((pk.has(K.RIGHT) || ax[6] > 0.5) && !boundAny('RIGHT')) steer += 1;
     if (set.steerMode === 'tilt' && this.lastDevice === 'touch') steer += this.tilt;
     else steer += t.steer;
     // gentle response curve for analog sticks
     steer = clamp(steer, -1, 1);
     st.steer = Math.sign(steer) * Math.pow(Math.abs(steer), 1.25);
 
-    const padThr = Math.max(ax[5] || 0, pk.has(K.A) || pk.has(K.R2) ? 1 : 0);
+    // analog trigger value when the action is on a trigger, else digital
+    const level = a => { let v = 0; for (const n of bd[a] || []) v = Math.max(v, n === 'RT' ? ax[5] || 0 : n === 'LT' ? ax[4] || 0 : 0, this.held.has(n) ? 1 : 0); return v; };
+    const padThr = level('accel');
     const keyThr = k.has('ArrowUp') || k.has('KeyW') ? 1 : 0;
-    const brake = Math.max(ax[4] || 0, pk.has(K.L2) || pk.has('LT') ? 1 : 0, k.has('ArrowDown') || k.has('KeyS') ? 1 : 0, t.brake ? 1 : 0);
+    const brake = Math.max(level('brake'), k.has('ArrowDown') || k.has('KeyS') ? 1 : 0, t.brake ? 1 : 0);
     let thr = Math.max(padThr, keyThr, t.accel ? 1 : 0);
     if (set.autoAccel && this.lastDevice === 'touch') thr = 1;
     st.throttle = brake > 0.3 ? 0 : thr;
     st.brake = brake;
-    st.drift = pk.has(K.R1) || k.has('Space') || k.has('ShiftLeft') || k.has('KeyJ') || t.drift;
-    st.lookBack = k.has('KeyB') || pk.has(K.LS) || Math.abs(ax[3] || 0) > 0.7 && (ax[3] > 0);
+    st.drift = this.bound('drift') || k.has('Space') || k.has('ShiftLeft') || k.has('KeyJ') || t.drift;
+    st.lookBack = k.has('KeyB') || this.bound('lookback') || Math.abs(ax[3] || 0) > 0.7 && (ax[3] > 0);
   }
 
   applyTo(inp, race) {

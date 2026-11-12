@@ -28,12 +28,13 @@ function blobTex() {
 }
 // drift charge thresholds (charge-seconds) and release boosts per tier: blue → orange → purple
 export const DRIFT_LV = [0.65, 1.4, 2.35];
-const DRIFT_BOOST = [0, 0.45, 1.0, 1.75];
+const DRIFT_BOOST = [0, 0.55, 1.15, 1.95];
 const DRIFT_POW = [1, 1.16, 1.24, 1.32];
 export const DRIFT_COLORS = [0xffffff, 0x2fa8ff, 0xff8a1a, 0xd040ff];
 export const MAX_TOKENS = 10, TOKEN_BONUS = 0.008;   // +0.8 % top speed per token, +8 % at 10
 const HOP_VY = 3.7;                                  // ~0.28 s hop
 const SLIP_CHARGE = 2.0;
+export const DRIFT_FOLLOW = 0.85, DRIFT_BIAS = 0.25;
 
 const _f = { pos: new THREE.Vector3(), t: new THREE.Vector3(), r: new THREE.Vector3(), u: new THREE.Vector3(), k: 0 };
 const _fwd = new THREE.Vector3(), _left = new THREE.Vector3(), _m = new THREE.Matrix4(), _v = new THREE.Vector3(), _q = new THREE.Quaternion();
@@ -363,7 +364,12 @@ export class Racer {
     const spdF = clamp(Math.abs(this.speed) / 16, 0, 1);
     let w;
     // drift arc: steer in = tight (×1.15), neutral = ×0.6, full counter-steer = almost straight (×0.05)
-    if (d.on) w = d.dir * this.grip * this.driftTurn * (0.6 + 0.55 * clamp(steer * d.dir, -1, 1)) * 0.62;
+    // v1.4: the slide follows the road through a bend in its own direction (85 %), so a drift can be held
+    // through long sweepers on any track; the stick then tightens/widens around that line.
+    if (d.on) {
+      const kk = tr.frame(this.dist, _f).k, follow = kk * d.dir > 0 ? kk * Math.abs(this.speed) * DRIFT_FOLLOW : 0;
+      w = follow + d.dir * this.grip * this.driftTurn * (DRIFT_BIAS + 0.55 * clamp(steer * d.dir, -1, 1)) * 0.62;
+    }
     else w = steer * this.grip * spdF * (1 - 0.32 * clamp(this.speed / top, 0, 1)) * 0.6 * Math.sign(this.speed || 1);
     if (this.air && !this.hopping) { w *= 0.35; this.psi *= Math.exp(-2.2 * dt); }
 

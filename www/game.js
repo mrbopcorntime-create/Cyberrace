@@ -35349,8 +35349,9 @@ void main(){
 
   // src/track.js
   var UP = new Vector3(0, 1, 0);
-  var ROAD_W = 24;
+  var ROAD_W = 30;
   var HALF_W = ROAD_W / 2;
+  var WS = HALF_W / 12;
   var STEP_TARGET = 1;
   var SPS = 1 / STEP_TARGET;
   function shapePoints(def, hMul, wMul) {
@@ -35611,7 +35612,7 @@ void main(){
           this.bank[i] = this.bank[i] * (1 - b) + seg.dir * 1.15 * b;
         }
         seg.bumpers = [];
-        for (let k = 0; k < 3; k++) seg.bumpers.push({ s: best + RAMP + 18 + k * ((AGL - 2 * RAMP - 36) / 2), x: [-6.5, 6.5, 0][k] * (rnd() < 0.5 ? 1 : -1), r: 1.2, cd: /* @__PURE__ */ new Map() });
+        for (let k = 0; k < 3; k++) seg.bumpers.push({ s: best + RAMP + 18 + k * ((AGL - 2 * RAMP - 36) / 2), x: [-6.5, 6.5, 0][k] * WS * (rnd() < 0.5 ? 1 : -1), r: 1.2, cd: /* @__PURE__ */ new Map() });
       }
       if (this.ags.length) this._applyBank();
       this.crests = [];
@@ -35657,7 +35658,7 @@ void main(){
         for (let tries = 0; tries < 30; tries++) {
           const s = 100 + rnd() * (L - 200);
           if (!free(s - 2, s + 12)) continue;
-          this.strips.push({ s, x: (rnd() - 0.5) * 14, len: 10, w: 5.5 });
+          this.strips.push({ s, x: (rnd() - 0.5) * 14 * WS, len: 10, w: 5.5 });
           take(s - 2, s + 12);
           break;
         }
@@ -35669,7 +35670,7 @@ void main(){
         let s = L * ((r + 0.35) / rows);
         for (let tries = 0; tries < 30 && !free(s - 3, s + 3); tries++) s += 13;
         take(s - 3, s + 3);
-        for (let c = -2; c <= 2; c++) this.capsules.push({ s, x: c * 4.2, active: true, timer: 0 });
+        for (let c = -2; c <= 2; c++) this.capsules.push({ s, x: c * 4.2 * WS, active: true, timer: 0 });
       }
       this.tokens = [];
       const addLine = (s0, x, n = 5) => {
@@ -35678,12 +35679,12 @@ void main(){
           if (!this.surface(s).gap) this.tokens.push({ s, x, active: true, timer: 0 });
         }
       };
-      for (const a of this.ags) addLine(a.s0 + 60, (rnd() < 0.5 ? -1 : 1) * 4.5, 6);
+      for (const a of this.ags) addLine(a.s0 + 60, (rnd() < 0.5 ? -1 : 1) * 4.5 * WS, 6);
       const lines = Math.max(6, Math.round(L / 230));
       for (let k = 0; k < lines; k++) {
         let s = L * ((k + 0.7) / lines) + (rnd() - 0.5) * 40;
         if (s < 100 || s > L - 100 || this.capsules.some((c) => Math.abs(c.s - s) < 30) || this.jumps.some((j) => s > j.s0 - 30 && s < j.s0 + j.ramp + j.gap + 10)) continue;
-        addLine(s, [-7, -3.5, 0, 3.5, 7][Math.floor(rnd() * 5)]);
+        addLine(s, [-7, -3.5, 0, 3.5, 7][Math.floor(rnd() * 5)] * WS);
       }
       this.hazards = [];
       const hz = def.hz;
@@ -35707,7 +35708,7 @@ void main(){
               h.side = 1;
             }
             if (type === "mine") {
-              h.mines = [0, 1, 2].map((m) => ({ s: s + m * 12, x: (rnd() - 0.5) * 18, active: true, t: 0 }));
+              h.mines = [0, 1, 2].map((m) => ({ s: s + m * 12, x: (rnd() - 0.5) * 18 * WS, active: true, t: 0 }));
             }
             if (type === "pulse") {
               h.period = 3.4;
@@ -40850,13 +40851,15 @@ void main(){
     return _blob;
   }
   var DRIFT_LV = [0.65, 1.4, 2.35];
-  var DRIFT_BOOST = [0, 0.45, 1, 1.75];
+  var DRIFT_BOOST = [0, 0.55, 1.15, 1.95];
   var DRIFT_POW = [1, 1.16, 1.24, 1.32];
   var DRIFT_COLORS = [16777215, 3123455, 16747034, 13648127];
   var MAX_TOKENS = 10;
   var TOKEN_BONUS = 8e-3;
   var HOP_VY = 3.7;
   var SLIP_CHARGE = 2;
+  var DRIFT_FOLLOW = 0.85;
+  var DRIFT_BIAS = 0.25;
   var _f = { pos: new Vector3(), t: new Vector3(), r: new Vector3(), u: new Vector3(), k: 0 };
   var _fwd = new Vector3();
   var _left = new Vector3();
@@ -41311,8 +41314,10 @@ void main(){
       }
       const spdF = clamp2(Math.abs(this.speed) / 16, 0, 1);
       let w;
-      if (d.on) w = d.dir * this.grip * this.driftTurn * (0.6 + 0.55 * clamp2(steer * d.dir, -1, 1)) * 0.62;
-      else w = steer * this.grip * spdF * (1 - 0.32 * clamp2(this.speed / top, 0, 1)) * 0.6 * Math.sign(this.speed || 1);
+      if (d.on) {
+        const kk = tr.frame(this.dist, _f).k, follow = kk * d.dir > 0 ? kk * Math.abs(this.speed) * DRIFT_FOLLOW : 0;
+        w = follow + d.dir * this.grip * this.driftTurn * (DRIFT_BIAS + 0.55 * clamp2(steer * d.dir, -1, 1)) * 0.62;
+      } else w = steer * this.grip * spdF * (1 - 0.32 * clamp2(this.speed / top, 0, 1)) * 0.6 * Math.sign(this.speed || 1);
       if (this.air && !this.hopping) {
         w *= 0.35;
         this.psi *= Math.exp(-2.2 * dt);
@@ -41674,7 +41679,7 @@ void main(){
           inp.steer = this.commitDir * Math.max(0.5, Math.min(1, inp.steer * this.commitDir + 0.1));
         } else {
           const openNear = tr.isOpen(s0) || tr.isOpen(s0 + 30) || tr.isOpen(s0 + 60) || tr.isOpen(s0 + 90);
-          const want = !openNear && !nearJump && this.hopCd <= 0 && Math.abs(kFar.avg) > 42e-4 && Math.abs(kNear) > 38e-4 && r.speed > 30 && Math.random() < 0.9 * this.skill && Math.sign(kNear) === Math.sign(kFar.avg) && Math.abs(r.x) < HALF_W - 4;
+          const want = !openNear && !nearJump && this.hopCd <= 0 && Math.abs(kFar.avg) > 32e-4 && Math.abs(kNear) > 28e-4 && r.speed > 30 && Math.random() < 0.9 * this.skill && Math.sign(kNear) === Math.sign(kFar.avg) && Math.abs(r.x) < HALF_W - 4;
           inp.drift = want;
           if (want) {
             this.commit = 0.5;
@@ -41691,8 +41696,9 @@ void main(){
         inp.drift = !done;
         if (inp.drift) {
           const err = desiredPsi - r.psi;
-          const need = kNear * sp * r.drift.dir / (r.grip * r.driftTurn * 0.62);
-          const base = (need - 0.6) / 0.55;
+          const kd = kNear * sp * r.drift.dir, follow = kd > 0 ? kd * DRIFT_FOLLOW : 0;
+          const need = (kd - follow) / (r.grip * r.driftTurn * 0.62);
+          const base = (need - DRIFT_BIAS) / 0.55;
           inp.steer = clamp2(r.drift.dir * clamp2(base, -1, 1) + err * 1.8, -1, 1);
         }
       }
@@ -43141,6 +43147,23 @@ void main(){
 
   // src/input.js
   var K = { A: 96, B: 97, X: 99, Y: 100, L1: 102, R1: 103, L2: 104, R2: 105, LS: 106, RS: 107, START: 108, SELECT: 109, MODE: 110, UP: 19, DOWN: 20, LEFT: 21, RIGHT: 22, CENTER: 23, ENTER: 66, ESC: 111 };
+  var KEY_NAME = { [K.A]: "A", [K.B]: "B", [K.X]: "X", [K.Y]: "Y", [K.L1]: "L1", [K.R1]: "R1", [K.L2]: "LT", [K.R2]: "RT", [K.LS]: "LS", [K.RS]: "RS", [K.START]: "START", [K.SELECT]: "SELECT", [K.UP]: "UP", [K.DOWN]: "DOWN", [K.LEFT]: "LEFT", [K.RIGHT]: "RIGHT" };
+  var GP_NAME = ["A", "B", "X", "Y", "L1", "R1", "LT", "RT", "SELECT", "START", "LS", "RS", "UP", "DOWN", "LEFT", "RIGHT"];
+  var PAD_LABEL = { A: "A", B: "B", X: "X", Y: "Y", L1: "LB", R1: "RB", LT: "LT", RT: "RT", LS: "L3", RS: "R3", SELECT: "VIEW", START: "MENU", UP: "D-UP", DOWN: "D-DOWN", LEFT: "D-LEFT", RIGHT: "D-RIGHT" };
+  var PAD_ACTIONS = [
+    { id: "accel", label: "ACCELERATE" },
+    { id: "brake", label: "BRAKE / REVERSE" },
+    { id: "drift", label: "HOP / DRIFT" },
+    { id: "item", label: "USE ITEM" },
+    { id: "melee", label: "MELEE STRIKE" },
+    { id: "fuse", label: "FUSE ITEMS" },
+    { id: "lookback", label: "LOOK BACK" },
+    { id: "camera", label: "CAMERA MODE" },
+    { id: "zoomIn", label: "VIEW CLOSER" },
+    { id: "zoomOut", label: "VIEW FARTHER" }
+  ];
+  var DEFAULT_BINDS = { accel: ["RT", "A"], brake: ["LT"], drift: ["R1"], item: ["L1", "X"], melee: ["B"], fuse: ["Y"], lookback: ["LS"], camera: ["RS", "SELECT"], zoomIn: ["UP"], zoomOut: ["DOWN"] };
+  var EDGE_ACTIONS = ["drift", "item", "melee", "fuse", "camera", "zoomIn", "zoomOut"];
   var Input = class {
     constructor(game) {
       this.game = game;
@@ -43148,6 +43171,9 @@ void main(){
       this.edges = { item: false, melee: false, fuse: false, drift: false, camera: false, pause: false, zoom: false };
       this.keys = /* @__PURE__ */ new Set();
       this.pad = { keys: /* @__PURE__ */ new Set(), axes: [0, 0, 0, 0, 0, 0, 0, 0], active: false, lastT: 0 };
+      this.held = /* @__PURE__ */ new Set();
+      this.capture = null;
+      this.onCapture = null;
       this.touch = { steer: 0, accel: false, brake: false, drift: false, held: /* @__PURE__ */ new Map() };
       this.tilt = 0;
       this.onNav = null;
@@ -43175,10 +43201,15 @@ void main(){
       window.NCR_padKey = (code, down) => {
         this.pad.active = true;
         this.lastDevice = "pad";
+        const n = KEY_NAME[code];
         if (down) {
           this.pad.keys.add(code);
+          if (n && this._press(n)) return;
           this._padEdge(code);
-        } else this.pad.keys.delete(code);
+        } else {
+          this.pad.keys.delete(code);
+          if (n) this._release(n, "key");
+        }
       };
       window.NCR_padAxes = (ax) => {
         this.pad.active = true;
@@ -43189,8 +43220,7 @@ void main(){
         this._axisNav(ax[7], prev[7], "up", "down");
         this._axisNav(ax[0], prev[0], "left", "right", 0.6);
         this._axisNav(ax[1], prev[1], "up", "down", 0.6);
-        if (ax[4] > 0.5 && prev[4] <= 0.5) this.pad.keys.add("LT");
-        if (ax[4] < 0.4) this.pad.keys.delete("LT");
+        this._axisButtons(ax, prev);
       };
       window.addEventListener("deviceorientation", (e) => {
         if (e.gamma == null) return;
@@ -43199,34 +43229,93 @@ void main(){
         this.tilt = clamp2(v / 22, -1, 1);
       });
     }
+    // triggers and hat → named buttons (threshold with hysteresis)
+    _axisButtons(ax, prev) {
+      const btn = (name, v, pv) => {
+        if (v > 0.5 && !(pv > 0.5)) {
+          if (!this._press(name)) this._padEdgeName(name);
+        } else if (v < 0.4 && pv >= 0.4) this._release(name, "axis");
+      };
+      btn("LT", ax[4], prev[4]);
+      btn("RT", ax[5], prev[5]);
+      {
+        const hb = (name, v, pv) => {
+          if (v > 0.5 && !(pv > 0.5)) this._press(name, true);
+          else if (!(v > 0.5) && pv > 0.5) this._release(name, "axis");
+        };
+        hb("RIGHT", ax[6], prev[6]);
+        hb("LEFT", -ax[6], -prev[6]);
+        hb("DOWN", ax[7], prev[7]);
+        hb("UP", -ax[7], -prev[7]);
+      }
+    }
+    binds() {
+      const b = this.game.settings.padBinds;
+      return b && typeof b === "object" ? { ...DEFAULT_BINDS, ...b } : DEFAULT_BINDS;
+    }
+    bound(action) {
+      const l = this.binds()[action] || [];
+      for (const n of l) if (this.held.has(n)) return true;
+      return false;
+    }
+    // returns true when the press was consumed by a remap capture
+    _press(name, fromHat) {
+      this.held.add(name);
+      this.pad.active = true;
+      this.lastDevice = "pad";
+      if (this.capture) {
+        if (name === "START") {
+          this._endCapture(null);
+          return true;
+        }
+        this._endCapture(name);
+        return true;
+      }
+      const g = this.game, racing = g.race && g.state === "race" && !g.race.paused && !g.ui.screen;
+      const b = this.binds();
+      for (const a of EDGE_ACTIONS) if ((b[a] || []).includes(name)) {
+        if (a === "zoomIn" || a === "zoomOut") {
+          if (racing) {
+            g.cycleCamZoom(a === "zoomIn" ? -1 : 1);
+            this._zoomUsed = name;
+          }
+        } else this.edges[a] = true;
+      }
+      if (fromHat) return false;
+      return racing && this._zoomUsed === name ? (this._zoomUsed = null, true) : false;
+    }
+    _release(name) {
+      this.held.delete(name);
+    }
+    _endCapture(name) {
+      const a = this.capture;
+      this.capture = null;
+      if (name && a) {
+        const b = { ...this.binds() };
+        const old = b[a];
+        for (const k in b) if (k !== a && b[k].includes(name)) {
+          b[k] = b[k].filter((n) => n !== name);
+          if (!b[k].length) b[k] = old.filter((n) => n !== name);
+        }
+        b[a] = [name];
+        this.game.settings.padBinds = b;
+        this.game.saveSettings();
+      }
+      if (this.onCapture) this.onCapture(a, name);
+    }
+    startCapture(action) {
+      this.capture = action;
+    }
+    resetBinds() {
+      delete this.game.settings.padBinds;
+      this.game.saveSettings();
+    }
+    _padEdgeName(name) {
+      const code = +Object.keys(KEY_NAME).find((k) => KEY_NAME[k] === name);
+      if (code) this._padEdge(code);
+    }
     _padEdge(code) {
-      const g = this.game;
-      switch (code) {
-        case K.L1:
-        case K.X:
-          this.edges.item = true;
-          break;
-        case K.B:
-          this.edges.melee = true;
-          break;
-        case K.Y:
-          this.edges.fuse = true;
-          break;
-        case K.R1:
-          this.edges.drift = true;
-          break;
-        case K.RS:
-        case K.SELECT:
-          this.edges.camera = true;
-          break;
-        case K.START:
-          this._nav("start");
-          break;
-      }
-      if ((code === K.UP || code === K.DOWN) && g.race && g.state === "race" && !g.race.paused && !g.ui.screen) {
-        g.cycleCamZoom(code === K.UP ? -1 : 1);
-        return;
-      }
+      if (code === K.START) this._nav("start");
       const nav = { [K.UP]: "up", [K.DOWN]: "down", [K.LEFT]: "left", [K.RIGHT]: "right", [K.A]: "ok", [K.CENTER]: "ok", [K.ENTER]: "ok", [K.B]: "back", [K.ESC]: "back" }[code];
       if (nav) this._nav(nav);
       if (code === K.L2) this._nav("prev");
@@ -43255,13 +43344,12 @@ void main(){
         this.pad.active = true;
         this.lastDevice = "pad";
       }
-      const map = { 0: K.A, 1: K.B, 2: K.X, 3: K.Y, 4: K.L1, 5: K.R1, 8: K.SELECT, 9: K.START, 11: K.RS, 12: K.UP, 13: K.DOWN, 14: K.LEFT, 15: K.RIGHT };
-      for (const i in map) {
-        if (edge(+i)) {
-          this.pad.keys.add(map[i]);
-          this._padEdge(map[i]);
+      for (let i = 0; i < GP_NAME.length; i++) {
+        const n = GP_NAME[i];
+        if (edge(i)) {
+          if (!this._press(n)) this._padEdgeName(n);
         }
-        if (!now[+i] && prev[+i]) this.pad.keys.delete(map[i]);
+        if (!now[i] && prev[i]) this._release(n);
       }
       const ax = [gp.axes[0] || 0, gp.axes[1] || 0, gp.axes[2] || 0, gp.axes[3] || 0, gp.buttons[6] ? gp.buttons[6].value : 0, gp.buttons[7] ? gp.buttons[7].value : 0, 0, 0];
       const pax = this.pad.axes;
@@ -43285,21 +43373,30 @@ void main(){
       if (k.has("ArrowRight") || k.has("KeyD")) steer += 1;
       const stick = Math.abs(ax[0]) > 0.12 ? (ax[0] - Math.sign(ax[0]) * 0.12) / 0.88 : 0;
       steer += stick;
-      if (pk.has(K.LEFT) || ax[6] < -0.5) steer -= 1;
-      if (pk.has(K.RIGHT) || ax[6] > 0.5) steer += 1;
+      const bd = this.binds(), boundAny = (n) => {
+        for (const a in bd) if (bd[a].includes(n)) return true;
+        return false;
+      };
+      if ((pk.has(K.LEFT) || ax[6] < -0.5) && !boundAny("LEFT")) steer -= 1;
+      if ((pk.has(K.RIGHT) || ax[6] > 0.5) && !boundAny("RIGHT")) steer += 1;
       if (set.steerMode === "tilt" && this.lastDevice === "touch") steer += this.tilt;
       else steer += t.steer;
       steer = clamp2(steer, -1, 1);
       st.steer = Math.sign(steer) * Math.pow(Math.abs(steer), 1.25);
-      const padThr = Math.max(ax[5] || 0, pk.has(K.A) || pk.has(K.R2) ? 1 : 0);
+      const level = (a) => {
+        let v = 0;
+        for (const n of bd[a] || []) v = Math.max(v, n === "RT" ? ax[5] || 0 : n === "LT" ? ax[4] || 0 : 0, this.held.has(n) ? 1 : 0);
+        return v;
+      };
+      const padThr = level("accel");
       const keyThr = k.has("ArrowUp") || k.has("KeyW") ? 1 : 0;
-      const brake = Math.max(ax[4] || 0, pk.has(K.L2) || pk.has("LT") ? 1 : 0, k.has("ArrowDown") || k.has("KeyS") ? 1 : 0, t.brake ? 1 : 0);
+      const brake = Math.max(level("brake"), k.has("ArrowDown") || k.has("KeyS") ? 1 : 0, t.brake ? 1 : 0);
       let thr = Math.max(padThr, keyThr, t.accel ? 1 : 0);
       if (set.autoAccel && this.lastDevice === "touch") thr = 1;
       st.throttle = brake > 0.3 ? 0 : thr;
       st.brake = brake;
-      st.drift = pk.has(K.R1) || k.has("Space") || k.has("ShiftLeft") || k.has("KeyJ") || t.drift;
-      st.lookBack = k.has("KeyB") || pk.has(K.LS) || Math.abs(ax[3] || 0) > 0.7 && ax[3] > 0;
+      st.drift = this.bound("drift") || k.has("Space") || k.has("ShiftLeft") || k.has("KeyJ") || t.drift;
+      st.lookBack = k.has("KeyB") || this.bound("lookback") || Math.abs(ax[3] || 0) > 0.7 && ax[3] > 0;
     }
     applyTo(inp, race) {
       const s = this.state, e = this.edges;
@@ -46752,6 +46849,26 @@ registerProcessor('tp-limiter', TPLimiter);`;
         case "resetsave":
           this.show("confirmreset");
           break;
+        case "rebind": {
+          const inp = g.input;
+          if (inp.capture === ds.v) {
+            inp.capture = null;
+            this.refresh();
+            break;
+          }
+          inp.startCapture(ds.v);
+          inp.onCapture = () => {
+            g.audio.sfx("ui");
+            this.refresh();
+          };
+          this.refresh();
+          break;
+        }
+        case "resetbinds":
+          g.input.resetBinds();
+          g.input.capture = null;
+          this.refresh();
+          break;
         case "doreset":
           g.resetProfile();
           this.show("main", false);
@@ -47028,7 +47145,7 @@ registerProcessor('tp-limiter', TPLimiter);`;
       <section data-f="1"><h3>LAUNCH</h3><p>Hold accelerate as the "1" fades for a <b>perfect launch</b>; a little early or late still gets a smaller rocket start. Rev before "2" is gone and the engine stalls.</p></section>
       <section data-f="1"><h3>ITEMS</h3><p>Capsules give items into two slots. Leaders get defensive items; racers at the back get speed and firepower.</p><div class="fzs">${items}</div></section>
       <section data-f="1"><h3>FUSION \u2014 COMBINE BOTH SLOTS</h3><p>With two items held, press FUSE (or tap the item slots) to merge them into one empowered item. Every pairing makes something different:</p><div class="fzs">${fz}</div></section>
-      <section data-f="1"><h3>CONTROLLER</h3><p>RT accelerate \xB7 LT brake/reverse \xB7 Left stick steer \xB7 R1 drift \xB7 L1 or X item \xB7 Y fuse \xB7 B melee \xB7 Right-stick click camera \xB7 D-pad up/down view distance \xB7 Push right stick down to look back \xB7 START pause.</p></section>
+      <section data-f="1"><h3>CONTROLLER</h3><p>${PAD_ACTIONS.map((a) => `${a.label.toLowerCase()} <b>${(this.game.input.binds()[a.id] || []).map((n) => PAD_LABEL[n] || n).join("/")}</b>`).join(" \xB7 ")} \xB7 left stick steers \xB7 MENU pauses. Every button can be remapped in Settings.</p></section>
       <section data-f="1"><h3>TOUCH</h3><p>Left thumb steers (floating stick, buttons, or tilt). Right thumb: GO, DRIFT, ITEM, STRIKE, BRAKE. Slide your thumb between GO and DRIFT without lifting. Turn on Auto-Accelerate in Settings for one-thumb play.</p></section>
     </div>`;
     }
@@ -47050,6 +47167,12 @@ registerProcessor('tp-limiter', TPLimiter);`;
       <div class="srow"><span>HAPTICS</span>${opt("haptics", true, "ON")}${opt("haptics", false, "OFF")}</div>
       <div class="srow"><span>SHOW FPS</span>${opt("showFps", true, "ON")}${opt("showFps", false, "OFF")}</div>
       ${sl("musicVol", 0, 1, 0.05, "MUSIC")}${sl("sfxVol", 0, 1, 0.05, "EFFECTS")}
+      <h4 class="shead">CONTROLLER BUTTONS <small>select an action, then press the button you want \xB7 MENU cancels</small></h4>
+      ${PAD_ACTIONS.map((a) => {
+        const cap = this.game.input.capture === a.id, b = this.game.input.binds()[a.id] || [];
+        return `<div class="srow bind"><span>${a.label}</span><button class="tab ${cap ? "selected capture" : ""}" data-act="rebind" data-v="${a.id}" data-key="b_${a.id}">${cap ? "PRESS A BUTTON\u2026" : b.map((n) => `<kbd>${PAD_LABEL[n] || n}</kbd>`).join(" ") || "\u2014"}</button></div>`;
+      }).join("")}
+      <div class="srow"><span></span><button class="tab" data-act="resetbinds" data-key="resetbinds">RESET CONTROLLER TO DEFAULT</button></div>
       <div class="srow"><span>DATA</span><button class="tab danger" data-act="resetsave" data-key="reset">RESET PROGRESS</button></div>
     </div>`;
     }
