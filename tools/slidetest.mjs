@@ -31,7 +31,7 @@ for (const [c, t] of list) for (const cls of (process.env.CLS || 'kart,bike,quad
           if (!hopped && s > s0 - 14) { inp.driftPressed = true; inp.drift = true; inp.steer = dir; hopped = true; }
           else if (pl.drift.on) {
             const need = (k * sp * dir) / (pl.grip * pl.driftTurn * 0.62);
-            let base = need >= 0.6 ? (need - 0.6) / 0.55 : (need - 0.6) / 0.35;
+            let base = need >= 0.6 ? (need - 0.6) / 0.55 : (need - 0.6) / 0.78;
             const err = (Math.atan2((dir * 3) - pl.x, 14) - pl.psi);
             base = Math.max(-1, Math.min(1, base * dir + err * 1.6 * dir)) * dir;
             if (WIG > 0) { const ph = (t % WIG) / WIG; inp.steer = ph < 0.4 ? -dir * 0.75 : dir * Math.max(0.5, base * dir); } else inp.steer = base;

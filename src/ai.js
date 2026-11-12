@@ -1,5 +1,6 @@
 import { HALF_W } from './track.js';
 import { clamp, wrap } from './util.js';
+import { SLIDE_OUT } from './racer.js';
 
 // Drives a Racer by writing to racer.inp each frame.
 export class AIDriver {
@@ -114,7 +115,7 @@ export class AIDriver {
         // steer that makes the drift arc match the bend (w = k·v), then correct toward the racing line
         const err = desiredPsi - r.psi;
         const need = (kNear * sp * r.drift.dir) / (r.grip * r.driftTurn * 0.62);   // arc factor the bend needs
-        const base = need >= 0.6 ? (need - 0.6) / 0.55 : (need - 0.6) / 0.35;      // inverse of slideArc
+        const base = need >= 0.6 ? (need - 0.6) / 0.55 : (need - 0.6) / SLIDE_OUT;   // inverse of slideArc
         inp.steer = clamp(r.drift.dir * clamp(base, -1, 1) + err * 1.8, -1, 1);
       }
     }

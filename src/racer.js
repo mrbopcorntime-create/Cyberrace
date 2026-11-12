@@ -36,8 +36,11 @@ export const DRIFT_COLORS = [0xffffff, 0x2fa8ff, 0xff8a1a, 0xd040ff];
 export const MAX_TOKENS = 10, TOKEN_BONUS = 0.008;   // +0.8 % top speed per token, +8 % at 10
 const HOP_VY = 3.7;                                  // ~0.28 s hop
 const SLIP_CHARGE = 2.0;
-// slide arc factor from the stick (relative to the slide direction): in = tight, neutral = medium, out = wide
-export function slideArc(s) { return s >= 0 ? 0.6 + 0.55 * s : 0.6 + 0.35 * s; }
+// slide arc factor from the stick (relative to the slide direction): in = tight, neutral = medium,
+// counter-steer = straightens out, full counter-steer = runs dead straight / drifts slightly the other way
+// while the vehicle stays sideways (classic: hold a slide down a straight, line up the exit).
+export const SLIDE_OUT = 0.78;
+export function slideArc(s) { return s >= 0 ? 0.6 + 0.55 * s : 0.6 + SLIDE_OUT * s; }
 const WIG_OUT = -0.35, WIG_IN = 0.35, WIG_MIN = 0.1;   // stick thresholds (× slide dir) and min seconds per wiggle
 const HOP_TURN = 0.9;                                 // extra yaw rate (rad/s) while hopping: the hop-turn
 
@@ -541,7 +544,7 @@ export class Racer {
     tr.frame(this.dist, _f);
     const p = this.worldPos.copy(_f.pos).addScaledVector(_f.r, this.x).addScaledVector(_f.u, this.h);
     const dr = this.drift;
-    this.slideYaw = damp(this.slideYaw || 0, dr.on ? dr.dir * (0.6 + 0.14 * clamp(this.inp.steer * dr.dir, -1, 1)) : 0, dr.on ? 10 : 7, dt);
+    this.slideYaw = damp(this.slideYaw || 0, dr.on ? dr.dir * (0.6 + (this.inp.steer * dr.dir > 0 ? 0.14 : 0.05) * clamp(this.inp.steer * dr.dir, -1, 1)) : 0, dr.on ? 10 : 7, dt);
     let yaw = this.psi + this.slideYaw + this.spinAng;
     if (this.spinBoostT > 0) { const k = 1 - this.spinBoostT / 0.5; yaw += this.spinBoostDir * Math.PI * 2 * (k * k * (3 - 2 * k)); }
     if (this.ag > 0) p.addScaledVector(_f.u, 0.35 * this.ag + Math.sin(race.time * 7 + this.idx) * 0.06 * this.ag);   // magnetic hover
@@ -581,7 +584,8 @@ export class Racer {
     if (dr.bounce > 0) dr.bounce = Math.max(0, dr.bounce - dt * 5);
     body.position.y = this.squash * -0.12 + (dr.on ? Math.abs(Math.sin(race.time * 14)) * 0.06 + Math.sin((1 - (dr.bounce || 0)) * Math.PI) * 0.22 * (dr.bounce > 0 ? 1 : 0) : 0);
     body.scale.y = 1 - this.squash * 0.08;
-    if (this.model.authored) animateVehicle(this.model, dt, { speed: this.state === 'fall' ? 0 : this.speed, steer: this.drift.on ? this.drift.dir * 0.6 : this.inp.steer, throttle: this.inp.throttle, boost: this.boostT > 0, drift: this.drift.on ? this.drift.level : 0, tierColor: DRIFT_COLORS[this.drift.level] });
+    if (this.model.authored) animateVehicle(this.model, dt, { speed: this.state === 'fall' ? 0 : this.speed, steer: this.inp.steer,   // opposite lock shows on the front wheels when counter-steering a slide
+ throttle: this.inp.throttle, boost: this.boostT > 0, drift: this.drift.on ? this.drift.level : 0, tierColor: DRIFT_COLORS[this.drift.level] });
     else for (const w of this.model.wheels) w.children[0] && (w.rotation.x += this.speed * dt * 1.9);
     // visibility blink when invulnerable
     this.root.visible = this.state !== 'fall' || this.fallT > 0.35;

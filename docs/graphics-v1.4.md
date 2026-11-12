@@ -45,7 +45,7 @@
 
 ## Hop and power-slide (`src/racer.js`)
 - Hop: tap DRIFT. Steering in the air adds a pivot (`HOP_TURN` 0.9 rad/s, the hop-turn).
-- Slide: land from a hop while holding DRIFT and steering. The arc no longer follows the road; the stick sets it (`slideArc`): pushing into the corner gives 1.15× (tight), neutral gives 0.6×, and pushing out gives 0.25× (wide).
+- Slide: land from a hop while holding DRIFT and steering. The arc no longer follows the road; the stick sets it (`slideArc`): pushing into the corner gives 1.15× (tight), neutral gives 0.6×, and counter-steer straightens it out. Full counter-steer gives -0.18× (`SLIDE_OUT` 0.78), so the vehicle runs straight or slightly the other way while staying sideways, with the front wheels on opposite lock (v1.5.1).
 - Mini-turbo: each **wiggle** (stick to the outside of the slide past -0.35, then back in past +0.35, at least 0.1 s apart) jumps the charge to the next tier: blue → orange → purple. Holding the slide also charges, slowly (`DRIFT_LV` 1.2 / 2.6 / 4.2 s). Release DRIFT to fire.
 - Each wiggle gives a body bounce and a small haptic pulse. The slide pose is 0.6 rad side-on (plus 0.14 when pushing into the corner). The chase camera follows the direction of travel, so you see the vehicle side-on during a slide.
 - AI: uses the same arc model, with virtual wiggles every `0.95 - 0.45 × skill` seconds.
