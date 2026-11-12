@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { glowTex, mergeStatic } from './util.js';
+import { buildAuthoredVehicle } from './vehicles.js';
 
 // Shared geometry cache (keyed by detail level: 2 = high/LOD0, 1 = low/LOD1)
 let DETAIL = 2;
@@ -88,7 +89,9 @@ function lightSprite(color, size) {
 }
 
 // Builds a vehicle facing +Z, ground at y=0. Returns { root, body, wheels, tail:[Vector3 local], parts }
-export function buildVehicle(cls, paint, neonColor, accent) {
+export function buildVehicle(cls, paint, neonColor, accent, riderColor) {
+  const authored = buildAuthoredVehicle(cls, paint, neonColor, riderColor ?? neonColor);
+  if (authored) return authored;
   const root = new THREE.Group();
   const body = new THREE.Group();
   root.add(body);

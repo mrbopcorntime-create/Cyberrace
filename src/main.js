@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Pipeline, PRESETS, installPCSS } from './render/pipeline.js';
+import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
 import { MIP_BIAS } from './track.js';
 import { CHARACTERS, CUPS, CLOCKS, STARTERS, PAINTS, NEONS, POINTS } from './data.js';
 import { Race, CAM_ZOOM, CAM_ZOOM_IDS } from './race.js';
@@ -9,6 +10,7 @@ import { HUD } from './hud.js';
 import { UI } from './ui.js';
 import { Achievements, loadProfile, saveProfile, loadSettings, saveSettings, defaultProfile, mergeRace } from './save.js';
 import { buildVehicle, setEnvironment } from './models.js';
+import { loadVehicleModels, setVehicleEnvironment, animateVehicle } from './vehicles.js';
 import { clamp } from './util.js';
 
 const TIPS = [
@@ -36,12 +38,21 @@ class Menu3D {
     const dl = new THREE.DirectionalLight(0xffffff, 2); dl.position.set(3, 6, 4); s.add(dl);
     const rim = new THREE.DirectionalLight(0xff4fd8, 2.2); rim.position.set(-4, 2, -5); s.add(rim);
     const rim2 = new THREE.DirectionalLight(0x00e5ff, 2.2); rim2.position.set(5, 1, -3); s.add(rim2);
-    const grid = new THREE.GridHelper(200, 100, 0x00e5ff, 0x1a2a6a);
-    grid.material.transparent = true; grid.material.opacity = 0.55; s.add(grid);
-    this.grid = grid;
+    // glossy showroom floor with a texture-based neon grid (line primitives shimmer/vanish under TAA)
+    const gc = document.createElement('canvas'); gc.width = gc.height = 256; const gx = gc.getContext('2d');
+    gx.fillStyle = '#04060d'; gx.fillRect(0, 0, 256, 256);
+    gx.strokeStyle = 'rgba(40,70,170,0.9)'; gx.lineWidth = 2; for (let k = 0; k <= 256; k += 64) { gx.beginPath(); gx.moveTo(k, 0); gx.lineTo(k, 256); gx.moveTo(0, k); gx.lineTo(256, k); gx.stroke(); }
+    gx.strokeStyle = 'rgba(0,229,255,0.95)'; gx.lineWidth = 3; gx.strokeRect(0, 0, 256, 256);
+    const gt = new THREE.CanvasTexture(gc); gt.wrapS = gt.wrapT = THREE.RepeatWrapping; gt.repeat.set(50, 50); gt.anisotropy = 8; gt.colorSpace = THREE.SRGBColorSpace;
+    const grid = new THREE.Mesh(new THREE.PlaneGeometry(200, 200).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ map: gt, emissiveMap: gt, emissive: 0xffffff, emissiveIntensity: 0.9, color: 0x222831, roughness: 0.6, metalness: 0.0 }));
+    grid.position.y = -0.002; s.add(grid);
+    this.grid = { position: gt.offset, material: grid.material };
     const ring = new THREE.Mesh(new THREE.RingGeometry(3.2, 3.45, 64), new THREE.MeshBasicMaterial({ color: 0xff4fd8, side: THREE.DoubleSide }));
     ring.rotation.x = -Math.PI / 2; ring.position.y = 0.02; s.add(ring); this.ring = ring;
-    const disc = new THREE.Mesh(new THREE.CircleGeometry(3.2, 64), new THREE.MeshBasicMaterial({ color: 0x0a0d1e }));
+    // mirror-polished turntable (planar reflection) under a dark tint
+    const mirror = new Reflector(new THREE.CircleGeometry(3.2, 64), { textureWidth: 1024, textureHeight: 1024, color: 0x8a96a8 });
+    mirror.rotation.x = -Math.PI / 2; mirror.position.y = 0.004; s.add(mirror);
+    const disc = new THREE.Mesh(new THREE.CircleGeometry(3.2, 64), new THREE.MeshBasicMaterial({ color: 0x050812, transparent: true, opacity: 0.45, depthWrite: false }));
     disc.rotation.x = -Math.PI / 2; disc.position.y = 0.01; s.add(disc);
     // skyline
     const bg = new THREE.BoxGeometry(1, 1, 1); bg.translate(0, 0.5, 0);
@@ -64,8 +75,10 @@ class Menu3D {
     if (this.key === key) return;
     this.key = key;
     this.holder.clear();
-    const v = buildVehicle(cls, look.paint, look.neon, ch.accent);
-    v.root.scale.setScalar(1.25);
+    this.game.useDefaultEnvironment();
+    const v = buildVehicle(cls, look.paint, look.neon, ch.accent, ch.color);
+    this.v = v;
+    v.root.scale.setScalar(1.15);
     this.holder.add(v.root);
     this.ring.material.color.setHex(look.neon);
   }
@@ -75,16 +88,17 @@ class Menu3D {
     this.t += dt;
     this.offset += (this.targetOffset - this.offset) * (1 - Math.exp(-4 * dt));
     this.holder.rotation.y += dt * 0.5;
+    if (this.v) animateVehicle(this.v, dt, { speed: 0, steer: Math.sin(this.t * 0.7) * 0.6, throttle: 0.35 + 0.25 * Math.max(0, Math.sin(this.t * 2.3)), boost: false, drift: 0 });
     const cam = this.camera;
-    const r = 9.5 + Math.min(1, this.offset) * 3.5;
+    const r = 9.5 - Math.min(1, this.offset) * 1.7;
     const a = this.t * 0.08;
-    cam.position.set(Math.sin(a) * r, 3 + this.offset * 0.6, Math.cos(a) * r);
+    cam.position.set(Math.sin(a) * r, 3 - Math.min(1, this.offset) * 0.7, Math.cos(a) * r);
     const side = new THREE.Vector3(Math.cos(a), 0, -Math.sin(a));
     // shift look target so the vehicle sits to the right in 'right' view
-    const look = new THREE.Vector3(0, 1, 0).addScaledVector(side, -Math.min(1, this.offset) * (aspect > 1.3 ? 3.2 : 2.0) - Math.max(0, this.offset - 1) * 6);
+    const look = new THREE.Vector3(0, 1, 0).addScaledVector(side, -Math.min(1, this.offset) * (aspect > 1.3 ? 1.15 : 0.6) - Math.max(0, this.offset - 1) * 6);
     cam.lookAt(look);
     cam.aspect = aspect; cam.fov = aspect < 1.3 ? 52 : 40; cam.updateProjectionMatrix();
-    this.grid.position.z = (this.t * 4) % 2;
+    this.grid.position.y = (this.t * 0.08) % 1;
     this.holder.visible = this.targetOffset < 2 && this.offset < 1.8;
   }
 }
@@ -137,9 +151,28 @@ class Game {
     panel(0xff7a1a, 0, 1, -9.8, 10, 0.8); panel(0xffffff, 0, 4.9, 0, 6, 6); panel(0x9b5bff, 0, 3, 9.8, 12, 0.6);
     const top = env.children[env.children.length - 2]; top.rotation.x = Math.PI / 2;
     const pm = new THREE.PMREMGenerator(this.renderer);
-    setEnvironment(pm.fromScene(env, 0.02).texture);
+    const envTex = pm.fromScene(env, 0.02).texture;
+    this.defaultEnv = envTex; this.cupEnvs = {};
+    setEnvironment(envTex); setVehicleEnvironment(envTex);
     pm.dispose();
   }
+  // Reflection environment per tournament: neon panels in the cup's palette so glossy paint picks up the track colours
+  useCupEnvironment(cup) {
+    if (!this.cupEnvs[cup.id]) {
+      const pal = cup.pal, env = new THREE.Scene();
+      env.add(new THREE.Mesh(new THREE.BoxGeometry(20, 10, 20), new THREE.MeshBasicMaterial({ color: new THREE.Color(pal.sky2).multiplyScalar(0.6), side: THREE.BackSide })));
+      const panel = (c, k, x, y, z, w, h, ry = 0, rx = 0) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: new THREE.Color(c).multiplyScalar(k), side: THREE.DoubleSide })); m.position.set(x, y, z); m.rotation.set(rx, ry, 0); env.add(m); };
+      // horizon bands (track rails / skyline) + overhead strips (gates) + a soft key light
+      panel(pal.a, 3.2, -9.8, 0.6, 0, 20, 0.5, Math.PI / 2); panel(pal.a, 3.2, 9.8, 0.6, 0, 20, 0.5, Math.PI / 2);
+      panel(pal.b, 2.4, 0, 1.6, -9.8, 20, 0.9); panel(pal.c, 2.6, 0, 1.2, 9.8, 20, 0.6);
+      for (const z of [-6, 0, 6]) panel(pal.a, 2.2, 0, 4.9, z, 16, 0.35, 0, Math.PI / 2);
+      panel(0xffffff, 1.6, 3, 4.9, 2, 3, 3, 0, Math.PI / 2);
+      const pm = new THREE.PMREMGenerator(this.renderer);
+      this.cupEnvs[cup.id] = pm.fromScene(env, 0.03).texture; pm.dispose();
+    }
+    setEnvironment(this.cupEnvs[cup.id]); setVehicleEnvironment(this.cupEnvs[cup.id]);
+  }
+  useDefaultEnvironment() { setEnvironment(this.defaultEnv); setVehicleEnvironment(this.defaultEnv); }
   presetName() {
     const q = this.settings.quality;
     return PRESETS[q] ? q : 'quality';
@@ -415,7 +448,9 @@ class Game {
   touchMelee(cdf) { const c = this.input.troot && this.input.troot.querySelector('.melee .cd'); if (c) { c.style.strokeDashoffset = 113 * cdf; c.parentNode.parentNode.classList.toggle('ready', cdf <= 0); } }
 }
 
-window.addEventListener('load', () => {
+window.addEventListener('load', async () => {
+  try { await loadVehicleModels(); }
+  catch (e) { console.error('vehicle models failed to load, using procedural fallback', e); }
   try { window.game = new Game(); }
   catch (e) {
     console.error(e);

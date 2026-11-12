@@ -1,0 +1,23 @@
+import puppeteer from 'puppeteer-core';
+const url = 'file:///home/claude/cyberrace/www/index.html';
+const OUT = process.env.OUT, CUP = +(process.env.CUP||1), CLS = process.env.CLS||'kart', CH = process.env.CH||'jarvis';
+const browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new', protocolTimeout: 900000, args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--allow-file-access-from-files'] });
+const page = await browser.newPage();
+await page.setViewport({ width: 832, height: 384, deviceScaleFactor: 1.5, hasTouch: true });
+const errs = []; page.on('pageerror', e => errs.push(e.message));
+await page.evaluateOnNewDocument(n => { window.__N = n; }, +(process.env.N || 700));
+await page.goto(url); await new Promise(r => setTimeout(r, 1500));
+await page.evaluate(async (CUP, CLS, CH) => {
+  game.settings.quality = 'balanced'; game.settings.dynamicRes = false; game.applyQuality();
+  game.startSingle('quick', CUP, 1, 1, CH, CLS); await new Promise(r => setTimeout(r, 2600));
+  const race = game.race; race.paused = true; game.input.applyTo = () => {};
+  const pl = race.player, AI = race.ai[0].constructor, auto = new AI(pl, race, 1);
+  const N = +(new URLSearchParams(location.search).get('n') || 0) || 700;
+  const step = (rend) => { auto.update(1/60); race.paused = false; race.update(1 / 60); race.paused = true; if (rend) { race.render(1/60, innerWidth/innerHeight); game.draw(race.scene, race.camera, race.dynamicObjects(), race.camMode); } };
+  for (let i = 0; i < window.__N; i++) step(false);
+  for (let i = 0; i < 90; i++) step(true);
+  document.querySelectorAll('#hud, .hud, #touch').forEach(e => e.style.opacity = 0.0);
+}, CUP, CLS, CH);
+await page.screenshot({ path: `${OUT}/cup${CUP}_${CLS}.png` });
+console.log('ERRORS', errs.length ? errs.join('\n') : 'none');
+await browser.close();

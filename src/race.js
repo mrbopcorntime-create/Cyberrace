@@ -2,7 +2,7 @@ import * as THREE from 'three';
 // View-distance presets: chase distance/height (m), look-ahead, FOV offset; iso offsets scale by `iso`
 export const CAM_ZOOM = {
   close: { label: 'CLOSE', d: 4.3, h: 1.75, look: 5.5, up: 1.1, fov: -4, iso: 0.68 },
-  near: { label: 'NEAR', d: 5.7, h: 2.35, look: 6.2, up: 1.25, fov: -2, iso: 0.84 },
+  near: { label: 'NEAR', d: 5.2, h: 2.1, look: 6, up: 1.15, fov: -3, iso: 0.84 },
   standard: { label: 'STANDARD', d: 7.2, h: 3.0, look: 7, up: 1.4, fov: 0, iso: 1 },
   far: { label: 'FAR', d: 9.6, h: 3.9, look: 8, up: 1.6, fov: 2, iso: 1.25 },
   wide: { label: 'WIDE', d: 12.5, h: 5.2, look: 9.5, up: 1.8, fov: 4, iso: 1.55 },
@@ -64,6 +64,7 @@ export class Race {
     this.looseMesh.count = 0; this.looseMesh.frustumCulled = false; this.scene.add(this.looseMesh);
 
     // roster
+    game.useCupEnvironment(this.cup);
     this.racers = [];
     this.ai = [];
     const p = opts.player;
@@ -425,7 +426,7 @@ export class Race {
       pos = _v.copy(base).addScaledVector(fwd, this.lookBack ? dist : -dist).addScaledVector(up, Z.h * zs + (pl.air ? 0.6 : 0));
       look = _v2.copy(base).addScaledVector(fwd, this.lookBack ? -(Z.look + 1) : Z.look).addScaledVector(up, Z.up);
       const boostF = pl.boostT > 0 ? 10 : 0;
-      this.fov = damp(this.fov, 68 + Z.fov + spdN * 10 + boostF, 4, dt);
+      this.fov = damp(this.fov, 68 + Z.fov + spdN * 7 + boostF, 4, dt);
     }
     // keep camera above the road surface
     if (!this.camInit) { this.camPos.copy(pos); this.camLook.copy(look); this.camInit = true; }

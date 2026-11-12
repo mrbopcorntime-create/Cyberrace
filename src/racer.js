@@ -3,6 +3,7 @@ import { CLASSES } from './data.js';
 import { HALF_W } from './track.js';
 import { clamp, damp, wrap } from './util.js';
 import { buildVehicle, buildShield, Trail } from './models.js';
+import { animateVehicle } from './vehicles.js';
 
 export const GRAV = 26;
 let _tunnelTex;
@@ -84,7 +85,7 @@ export class Racer {
 
     // visuals
     const neon = o.neon || o.char.color;
-    const v = buildVehicle(o.cls, o.paint || 0x1a1d2b, neon, o.char.accent);
+    const v = buildVehicle(o.cls, o.paint || 0x1a1d2b, neon, o.char.accent, o.char.color);
     this.model = v; this.root = v.root; this.neonColor = new THREE.Color(neon);
     race.scene.add(this.root);
     this.shieldMesh = buildShield(0x4dfff3); this.shieldMesh.visible = false; this.root.add(this.shieldMesh);
@@ -556,7 +557,8 @@ export class Racer {
     }
     body.position.y = this.squash * -0.12 + (this.drift.on ? Math.abs(Math.sin(race.time * 18)) * 0.05 : 0);
     body.scale.y = 1 - this.squash * 0.08;
-    for (const w of this.model.wheels) w.children[0] && (w.rotation.x += this.speed * dt * 1.9);
+    if (this.model.authored) animateVehicle(this.model, dt, { speed: this.state === 'fall' ? 0 : this.speed, steer: this.drift.on ? this.drift.dir * 0.6 : this.inp.steer, throttle: this.inp.throttle, boost: this.boostT > 0, drift: this.drift.on ? this.drift.level : 0, tierColor: DRIFT_COLORS[this.drift.level] });
+    else for (const w of this.model.wheels) w.children[0] && (w.rotation.x += this.speed * dt * 1.9);
     // visibility blink when invulnerable
     this.root.visible = this.state !== 'fall' || this.fallT > 0.35;
     if (this.invulnT > 0) body.visible = Math.floor(race.time * 14) % 2 === 0; else body.visible = true;
