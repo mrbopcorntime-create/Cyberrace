@@ -31,3 +31,22 @@
 - `tools/racevis.mjs`: autopilot race screenshots (`CUP`, `CLS`, `CH`, `N` frames, `OUT`).
 - `tools/padtest.mjs`: remap smoke test.
 - `tools/perf.mjs`: draw calls and triangle counts (path fixed to this checkout).
+
+---
+
+# v1.5: classic power-slide and authored circuits
+
+## Courses (`src/layouts.js`)
+- All 24 courses are now authored as closed corner polygons `[x, z, radius, height]`. Each corner is filleted into an arc and the arcs are joined by straights, which gives every course real straights, hairpins, 90° corners, esses and sweepers.
+- Laps are classic kart-racer length, about 25–40 s (the finale and figure-8 bridge courses run up to about 50 s). Corner radii are 35–110 m, sized to the slide arc at racing speed.
+- Figure-8 courses cross on bridges (12–16 m clearance). Heights blend smoothly between corners, and the steepest grade is 0.23.
+- s = 0 sits 65 % of the way along the longest straight, so the grid has room behind the start line.
+- Tools: `node tools/layouts.mjs` reports length, minimum radius, corners and crossings. `python3 tools/plot_layouts.py layouts.json out.png` draws all 24 layouts.
+
+## Hop and power-slide (`src/racer.js`)
+- Hop: tap DRIFT. Steering in the air adds a pivot (`HOP_TURN` 0.9 rad/s, the hop-turn).
+- Slide: land from a hop while holding DRIFT and steering. The arc no longer follows the road; the stick sets it (`slideArc`): pushing into the corner gives 1.15× (tight), neutral gives 0.6×, and pushing out gives 0.25× (wide).
+- Mini-turbo: each **wiggle** (stick to the outside of the slide past -0.35, then back in past +0.35, at least 0.1 s apart) jumps the charge to the next tier: blue → orange → purple. Holding the slide also charges, slowly (`DRIFT_LV` 1.2 / 2.6 / 4.2 s). Release DRIFT to fire.
+- Each wiggle gives a body bounce and a small haptic pulse. The slide pose is 0.6 rad side-on (plus 0.14 when pushing into the corner). The chase camera follows the direction of travel, so you see the vehicle side-on during a slide.
+- AI: uses the same arc model, with virtual wiggles every `0.95 - 0.45 × skill` seconds.
+- Results: `tools/slidetest.mjs` (a scripted player hop-slides each track's tightest corner while wiggling) reaches purple in 3 wiggles and exits at 75–83 m/s, against about 60 m/s without the slide. In the 24-track sim every race finishes, with 4 jump-gap falls.

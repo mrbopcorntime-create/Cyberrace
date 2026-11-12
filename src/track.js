@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mulberry32, clamp, canvasTex, rgba, glowTex, glowMat, wrap, mergeStatic } from './util.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { LAYOUTS, layoutPoints } from './layouts.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
 export const ROAD_W = 30;            // v1.4: widened from 24 m so drifts have room to hold
@@ -71,6 +72,13 @@ export class Track {
   // ─── geometry sampling ────────────────────────────────────────────────────
   _generate() {
     const def = this.def;
+    const lay = LAYOUTS[def.name];
+    if (lay) {   // v1.5 authored circuit
+      const { pts, length } = layoutPoints(lay, STEP_TARGET);
+      this._frames(pts, length);
+      this._badCrossing();
+      return;
+    }
     let hMul = 1, wMul = 1;
     for (let attempt = 0; attempt < 10; attempt++) {
       const curve = new THREE.CatmullRomCurve3(shapePoints(def, hMul, wMul), true, 'centripetal', 0.5);

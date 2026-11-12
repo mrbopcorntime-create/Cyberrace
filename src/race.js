@@ -421,7 +421,7 @@ export class Race {
       this.fov = damp(this.fov, 50, 3, dt);
     } else {
       // over-the-shoulder chase, blended between car heading and track heading for stability
-      const fwd = new THREE.Vector3().copy(_f.t).lerp(pl.worldFwd, pl.spinT > 0 ? 0 : 0.35).normalize();
+      const fwd = new THREE.Vector3().copy(_f.t).lerp(pl.travelFwd || pl.worldFwd, pl.spinT > 0 ? 0 : 0.35).normalize();
       const dist = this.zoomK + spdN * 1.6 * (Z.d / 7.2);
       pos = _v.copy(base).addScaledVector(fwd, this.lookBack ? dist : -dist).addScaledVector(up, Z.h * zs + (pl.air ? 0.6 : 0));
       look = _v2.copy(base).addScaledVector(fwd, this.lookBack ? -(Z.look + 1) : Z.look).addScaledVector(up, Z.up);
@@ -490,6 +490,7 @@ function makeFx(race) {
     },
     dash(r) { if (r.isPlayer) { A.play('dash'); game.haptic(30, 140); } P.burst(r.worldPos, 0xbfefff, 14, 8, 0.6, 0.3); },
     driftStart(r) { if (r.isPlayer) A.play('drift_start'); },
+    wiggle(r) { game.haptic(8, 70); },
     driftLevel(r, lv) { if (r.isPlayer) { A.play('tick' + lv); game.haptic(12 + lv * 8, 120 + lv * 40); } },
     wall(r, side, impact) {
       if (near(r)) { _f.r.crossVectors(r.worldFwd, r.worldUp); P.burst(_v.copy(r.worldPos).addScaledVector(_f.r, side * 1.1).addScaledVector(r.worldUp, 0.5), 0xffd080, Math.min(30, 4 + impact), 9, 0.5, 0.35, 20); }

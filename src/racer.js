@@ -27,14 +27,19 @@ function blobTex() {
   _blob = new THREE.CanvasTexture(c); return _blob;
 }
 // drift charge thresholds (charge-seconds) and release boosts per tier: blue → orange → purple
-export const DRIFT_LV = [0.65, 1.4, 2.35];
+// v1.5: charge comes mainly from WIGGLES (stick to the outside of the slide and back in, classic
+// mini-turbo style); each wiggle jumps to the next tier. Holding the slide also charges, slowly.
+export const DRIFT_LV = [1.2, 2.6, 4.2];
 const DRIFT_BOOST = [0, 0.55, 1.15, 1.95];
 const DRIFT_POW = [1, 1.16, 1.24, 1.32];
 export const DRIFT_COLORS = [0xffffff, 0x2fa8ff, 0xff8a1a, 0xd040ff];
 export const MAX_TOKENS = 10, TOKEN_BONUS = 0.008;   // +0.8 % top speed per token, +8 % at 10
 const HOP_VY = 3.7;                                  // ~0.28 s hop
 const SLIP_CHARGE = 2.0;
-export const DRIFT_FOLLOW = 0.85, DRIFT_BIAS = 0.25;
+// slide arc factor from the stick (relative to the slide direction): in = tight, neutral = medium, out = wide
+export function slideArc(s) { return s >= 0 ? 0.6 + 0.55 * s : 0.6 + 0.35 * s; }
+const WIG_OUT = -0.35, WIG_IN = 0.35, WIG_MIN = 0.1;   // stick thresholds (× slide dir) and min seconds per wiggle
+const HOP_TURN = 0.9;                                 // extra yaw rate (rad/s) while hopping: the hop-turn
 
 const _f = { pos: new THREE.Vector3(), t: new THREE.Vector3(), r: new THREE.Vector3(), u: new THREE.Vector3(), k: 0 };
 const _fwd = new THREE.Vector3(), _left = new THREE.Vector3(), _m = new THREE.Matrix4(), _v = new THREE.Vector3(), _q = new THREE.Quaternion();
@@ -174,8 +179,14 @@ export class Racer {
 
   beginDrift(dir) {
     const d = this.drift;
-    d.on = true; d.dir = dir; d.t = 0; d.level = 0; this.squash = 0.6; this.hopGrace = 0;
+    d.on = true; d.dir = dir; d.t = 0; d.level = 0; d.phase = 1; d.armed = false; d.wigT = 0; d.wigs = 0; d.bounce = 0; this.squash = 0.6; this.hopGrace = 0;
     this.race.fx.driftStart(this);
+  }
+  _wiggle(d) {
+    d.wigs++; d.bounce = 1; this.squash = 0.35;
+    const next = DRIFT_LV[Math.min(2, d.level)];
+    if (d.t < next) d.t = next;
+    if (this.isPlayer) this.race.fx.wiggle && this.race.fx.wiggle(this);
   }
   launch(kind) {
     this.air = true; this.hopping = false; this.airT = 0;
@@ -353,9 +364,13 @@ export class Racer {
         }
         d.on = false; d.t = 0; d.level = 0;
       } else {
-        // charge: duration × sharpness (steering into the turn charges fastest, counter-steer slowest)
-        const sharp = (clamp(steer * d.dir, -1, 1) + 1) / 2;
-        d.t += dt * this.driftRate * (0.35 + 0.65 * sharp) * (this.air ? 0.3 : 1);
+        // charge: slow while holding; each wiggle (out → back in) jumps to the next tier
+        const rel = steer * d.dir;
+        d.t += dt * this.driftRate * (this.air ? 0.3 : 1);
+        d.wigT += dt;
+        if (this.aiWiggle) { if (d.wigT > this.aiWiggle && !this.air) { d.wigT = 0; this._wiggle(d); } }
+        else if (rel < WIG_OUT && d.phase === 1) { d.phase = -1; d.armed = d.wigT > WIG_MIN * 0.5; }
+        else if (rel > WIG_IN && d.phase === -1) { d.phase = 1; if (d.armed && d.wigT > WIG_MIN && !this.air) this._wiggle(d); d.wigT = 0; }
         const lv = d.t >= DRIFT_LV[2] ? 3 : d.t >= DRIFT_LV[1] ? 2 : d.t >= DRIFT_LV[0] ? 1 : 0;
         if (lv > d.level) { d.level = lv; race.fx.driftLevel(this, lv); }
       }
@@ -366,12 +381,10 @@ export class Racer {
     // drift arc: steer in = tight (×1.15), neutral = ×0.6, full counter-steer = almost straight (×0.05)
     // v1.4: the slide follows the road through a bend in its own direction (85 %), so a drift can be held
     // through long sweepers on any track; the stick then tightens/widens around that line.
-    if (d.on) {
-      const kk = tr.frame(this.dist, _f).k, follow = kk * d.dir > 0 ? kk * Math.abs(this.speed) * DRIFT_FOLLOW : 0;
-      w = follow + d.dir * this.grip * this.driftTurn * (DRIFT_BIAS + 0.55 * clamp(steer * d.dir, -1, 1)) * 0.62;
-    }
+    if (d.on) w = d.dir * this.grip * this.driftTurn * slideArc(clamp(steer * d.dir, -1, 1)) * 0.62;
     else w = steer * this.grip * spdF * (1 - 0.32 * clamp(this.speed / top, 0, 1)) * 0.6 * Math.sign(this.speed || 1);
     if (this.air && !this.hopping) { w *= 0.35; this.psi *= Math.exp(-2.2 * dt); }
+    if (this.hopping && !d.on) w += steer * HOP_TURN;   // pivot a little in the air (hop-turn)
 
     const k = tr.frame(this.dist, _f).k;
     const denom = Math.max(0.55, 1 - k * this.x);
@@ -527,7 +540,9 @@ export class Racer {
     const race = this.race, tr = race.track;
     tr.frame(this.dist, _f);
     const p = this.worldPos.copy(_f.pos).addScaledVector(_f.r, this.x).addScaledVector(_f.u, this.h);
-    let yaw = this.psi + (this.drift.on ? this.drift.dir * 0.42 : 0) + this.spinAng;
+    const dr = this.drift;
+    this.slideYaw = damp(this.slideYaw || 0, dr.on ? dr.dir * (0.6 + 0.14 * clamp(this.inp.steer * dr.dir, -1, 1)) : 0, dr.on ? 10 : 7, dt);
+    let yaw = this.psi + this.slideYaw + this.spinAng;
     if (this.spinBoostT > 0) { const k = 1 - this.spinBoostT / 0.5; yaw += this.spinBoostDir * Math.PI * 2 * (k * k * (3 - 2 * k)); }
     if (this.ag > 0) p.addScaledVector(_f.u, 0.35 * this.ag + Math.sin(race.time * 7 + this.idx) * 0.06 * this.ag);   // magnetic hover
     if (this.meleeAnim > 0) yaw += this.meleeDir * Math.sin((this.meleeAnim / 0.3) * Math.PI) * 0.45;
@@ -541,6 +556,8 @@ export class Racer {
     this.root.quaternion.setFromRotationMatrix(_m);
     this.root.position.copy(p);
     this.worldFwd.copy(_fwd);
+    // direction of travel (no slide angle): the chase camera follows this, so a power-slide is seen side-on
+    this.travelFwd = (this.travelFwd || new THREE.Vector3()).copy(_f.t).multiplyScalar(Math.cos(this.psi)).addScaledVector(_f.r, Math.sin(this.psi)).normalize();
 
     // body lean / bounce
     const body = this.model.body;
@@ -561,7 +578,8 @@ export class Racer {
       this.tunnel.material.map.offset.y = (race.time * 3.2) % 1;
       this.tunnel.scale.set(1 + k * 0.25, 1 + k * 0.25, 1 + k * 0.4);
     }
-    body.position.y = this.squash * -0.12 + (this.drift.on ? Math.abs(Math.sin(race.time * 18)) * 0.05 : 0);
+    if (dr.bounce > 0) dr.bounce = Math.max(0, dr.bounce - dt * 5);
+    body.position.y = this.squash * -0.12 + (dr.on ? Math.abs(Math.sin(race.time * 14)) * 0.06 + Math.sin((1 - (dr.bounce || 0)) * Math.PI) * 0.22 * (dr.bounce > 0 ? 1 : 0) : 0);
     body.scale.y = 1 - this.squash * 0.08;
     if (this.model.authored) animateVehicle(this.model, dt, { speed: this.state === 'fall' ? 0 : this.speed, steer: this.drift.on ? this.drift.dir * 0.6 : this.inp.steer, throttle: this.inp.throttle, boost: this.boostT > 0, drift: this.drift.on ? this.drift.level : 0, tierColor: DRIFT_COLORS[this.drift.level] });
     else for (const w of this.model.wheels) w.children[0] && (w.rotation.x += this.speed * dt * 1.9);

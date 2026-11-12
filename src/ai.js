@@ -1,6 +1,5 @@
 import { HALF_W } from './track.js';
 import { clamp, wrap } from './util.js';
-import { DRIFT_FOLLOW, DRIFT_BIAS } from './racer.js';
 
 // Drives a Racer by writing to racer.inp each frame.
 export class AIDriver {
@@ -14,6 +13,7 @@ export class AIDriver {
     this.wantDrift = false;
     this.aggr = 0.4 + Math.random() * 0.6;
     this.err = 0; this.errT = 0;
+    racer.aiWiggle = 0.95 - 0.45 * skill;   // seconds per mini-turbo wiggle (virtual: the stick is busy holding the arc)
   }
 
   update(dt) {
@@ -113,9 +113,8 @@ export class AIDriver {
         // modulate drift: tighter when far from target line
         // steer that makes the drift arc match the bend (w = k·v), then correct toward the racing line
         const err = desiredPsi - r.psi;
-        const kd = kNear * sp * r.drift.dir, follow = kd > 0 ? kd * DRIFT_FOLLOW : 0;
-        const need = (kd - follow) / (r.grip * r.driftTurn * 0.62);   // arc factor still required beyond the road-follow
-        const base = (need - DRIFT_BIAS) / 0.55;
+        const need = (kNear * sp * r.drift.dir) / (r.grip * r.driftTurn * 0.62);   // arc factor the bend needs
+        const base = need >= 0.6 ? (need - 0.6) / 0.55 : (need - 0.6) / 0.35;      // inverse of slideArc
         inp.steer = clamp(r.drift.dir * clamp(base, -1, 1) + err * 1.8, -1, 1);
       }
     }
