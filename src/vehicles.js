@@ -78,6 +78,36 @@ function dress(scene, mats, out) {
   });
 }
 
+// Far LOD: the dressed low-poly model baked into two meshes (lit solid + glowing neon) using per-vertex
+// colours = material colour × baked AO. ~15 draw calls → 2 for racers beyond ~70 m.
+function bakeFar(lo, env) {
+  lo.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(lo.matrixWorld).invert(), mw = new THREE.Matrix4(), nm = new THREE.Matrix3();
+  const out = { solid: { p: [], n: [], c: [] }, glow: { p: [], n: [], c: [] } };
+  const v = new THREE.Vector3(), nv = new THREE.Vector3();
+  lo.traverse(o => {
+    if (!o.isMesh) return;
+    const mat = o.material, g = o.geometry, pos = g.attributes.position, nor = g.attributes.normal, ao = g.attributes.color;
+    if (mat.transparent) return;
+    const dst = mat.isMeshBasicMaterial ? out.glow : out.solid;
+    mw.multiplyMatrices(inv, o.matrixWorld); nm.getNormalMatrix(mw);
+    const ids = g.index ? g.index.array : null, cnt = ids ? ids.length : pos.count;
+    for (let k = 0; k < cnt; k++) {
+      const i = ids ? ids[k] : k;
+      v.fromBufferAttribute(pos, i).applyMatrix4(mw); dst.p.push(v.x, v.y, v.z);
+      if (nor) nv.fromBufferAttribute(nor, i).applyMatrix3(nm).normalize(); else nv.set(0, 1, 0);
+      dst.n.push(nv.x, nv.y, nv.z);
+      const a = ao ? ao.getX(i) : 1;
+      dst.c.push(mat.color.r * a, mat.color.g * a, mat.color.b * a);
+    }
+  });
+  const grp = new THREE.Group();
+  const mk = (d, mat) => { if (!d.p.length) return; const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(d.p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(d.n, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(d.c, 3)); const m = new THREE.Mesh(g, mat); m.userData.dyn = true; grp.add(m); };
+  mk(out.solid, new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.5, roughness: 0.32, envMap: env, envMapIntensity: 1.6 }));
+  mk(out.glow, new THREE.MeshBasicMaterial({ vertexColors: true }));
+  return grp;
+}
+
 // flame jet texture: white core → orange → transparent, along the length
 let _flameTex;
 function flameTex() {
@@ -108,7 +138,8 @@ export function buildAuthoredVehicle(cls, paint, neon, riderColor) {
   const hi = t.hi.clone(true), lo = t.lo.clone(true);
   dress(hi, mats, out); dress(lo, mats, out);
   const lod = new THREE.LOD();
-  lod.addLevel(hi, 0, 0.12); lod.addLevel(lo, 42, 0.12);
+  const far = bakeFar(lo, ENV);
+  lod.addLevel(hi, 0, 0.12); lod.addLevel(lo, 30, 0.12); lod.addLevel(far, 70, 0.1);
   body.add(lod);
   // wheels (hi LOD spins/steers; lo is too far to notice)
   const wheels = [];
@@ -132,7 +163,7 @@ export function buildAuthoredVehicle(cls, paint, neon, riderColor) {
   const glow = new THREE.Mesh(new THREE.PlaneGeometry(cls === 'bike' ? 1.8 : 2.8, 3.8).rotateX(-Math.PI / 2),
     new THREE.MeshBasicMaterial({ map: glowTexC, color: neon, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false }));
   glow.position.y = 0.05; root.add(glow);
-  return { root, body, wheels, flames, tail: t.tails.map(v => v.clone()), neonMat: out.neonMats[0], exhaustMats: out.exhaustMats, authored: true, t: 0 };
+  return { root, body, lod, wheels, flames, tail: t.tails.map(v => v.clone()), neonMat: out.neonMats[0], exhaustMats: out.exhaustMats, authored: true, t: 0 };
 }
 
 const _c1 = new THREE.Color(0xff7a2a), _c2 = new THREE.Color(0x66c8ff), _c3 = new THREE.Color();
@@ -153,7 +184,7 @@ export function animateVehicle(v, dt, s) {
     f.core.scale.set(rad * 0.55, rad * 0.55, len * 0.7);
     f.outer.scale.set(rad, rad, len);
     f.outer.material.color.copy(col);
-    f.g.visible = s.speed > 2 || s.throttle > 0.1;
+    f.g.visible = (s.speed > 2 || s.throttle > 0.1) && v.lod.getCurrentLevel() < 2;
   }
   for (const m of v.exhaustMats) m.color.copy(s.boost ? _c1 : col).multiplyScalar(s.boost ? 3.2 : 1.6 + 1.2 * s.throttle);
 }

@@ -38,7 +38,8 @@ export class Race {
 
     const quality = game.quality;
     this.track = new Track(this.cup, this.def);
-    this.track.build(this.scene, quality);
+    const env = game.useCupEnvironment(this.cup);
+    this.track.build(this.scene, quality, env);
     this.scene.add(new THREE.HemisphereLight(0x9fc8ff, 0x201030, 1.4));
     const dl = new THREE.DirectionalLight(0xffffff, 1.6); dl.position.set(0.3, 1, 0.4); this.scene.add(dl);
     const rim = new THREE.DirectionalLight(this.cup.pal.a, 1.2); rim.position.set(-0.5, 0.3, -1); this.scene.add(rim);
@@ -64,7 +65,6 @@ export class Race {
     this.looseMesh.count = 0; this.looseMesh.frustumCulled = false; this.scene.add(this.looseMesh);
 
     // roster
-    game.useCupEnvironment(this.cup);
     this.racers = [];
     this.ai = [];
     const p = opts.player;

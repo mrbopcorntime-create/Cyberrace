@@ -3,7 +3,7 @@ const browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome
 const page = await browser.newPage();
 await page.setViewport({ width: 832, height: 384 });
 page.on('pageerror', e => console.log('ERR', e.message));
-await page.goto('file:///home/claude/ncr/www/index.html');
+await page.goto('file://' + new URL('../www/index.html', import.meta.url).pathname);
 await new Promise(r => setTimeout(r, 1200));
 for (const [c,t] of [[0,0],[2,2],[5,3]]) {
   const out = await page.evaluate(async (c,t) => {

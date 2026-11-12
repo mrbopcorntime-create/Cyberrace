@@ -171,6 +171,7 @@ class Game {
       this.cupEnvs[cup.id] = pm.fromScene(env, 0.03).texture; pm.dispose();
     }
     setEnvironment(this.cupEnvs[cup.id]); setVehicleEnvironment(this.cupEnvs[cup.id]);
+    return this.cupEnvs[cup.id];
   }
   useDefaultEnvironment() { setEnvironment(this.defaultEnv); setVehicleEnvironment(this.defaultEnv); }
   presetName() {
